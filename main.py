@@ -47,11 +47,11 @@ def main(args1, args2):
     test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=True)
 
     if args1.scaled:
-        torch.save(train_iter, './dataloader/train_dataloader_{}_ft.pth'.format(len(args1.columns)))
-        torch.save(train_iter, './dataloader/test_dataloader_{}_ft.pth'.format(len(args1.columns)))
+        torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}.pth'.format(len(args1.columns), args1.sampling_rate))
+        torch.save(train_iter, './dataloader/test_dataloader_{}_ft_{}.pth'.format(len(args1.columns), args1.sampling_rate))
     else:
-        torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft.pth'.format(len(args1.columns)))
-        torch.save(train_iter, './dataloader/test_dataloader_not_scaled_{}_ft.pth'.format(len(args1.columns)))
+        torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}.pth'.format(len(args1.columns), args1.sampling_rate))
+        torch.save(train_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}.pth'.format(len(args1.columns), args1.sampling_rate))
 
     if args1.target != None:
         n_features = len(args1.columns) - len(args1.target)
@@ -71,11 +71,11 @@ def main(args1, args2):
         train_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, device,
               out_dir =args1.model_path, model_name= args2.model_name, epochs = args1.epochs)
     else:
-        model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=no_features,
+        model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        Nf_lognorm=no_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
+                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        train_vae(no_features, train_iter, test_iter, model, optimizer,
+        train_vae(n_features, train_iter, test_iter, model, optimizer,
                   device, args1.model_path, model_name= args2.model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=args1.epochs)
 
 
@@ -103,17 +103,18 @@ if __name__ == '__main__':
                         help='')
     parser1.add_argument('--scaled', action='store_const', const=False, default=True,
                         help='')
-    parser1.add_argument("--sampling_rate", type=str, default="4s", help="[2s, 4s]")
+    parser1.add_argument("--sampling_rate", type=str, default="2s", help="[2s, 4s]")
     args1 = parser1.parse_args()
 
     parser2 = argparse.ArgumentParser()
     parser2.add_argument("--data_path", type=str, default=f'./data/FIORIRE/dataset_{args1.sampling_rate}/')
-    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_std_{args1.sampling_rate}.pkl', help="ae")
+    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
     if args1.scaled:
         parser2.add_argument("--model_name", default='ae_{}_ft_{}_sc'.format(len(args1.columns), args1.sampling_rate),
                              help="ae")
     else:
         parser2.add_argument("--model_name", default='ae_{}_ft_{}'.format(len(args1.columns), args1.sampling_rate), help="ae")
     args2 = parser2.parse_args()
+
 
     main(args1, args2)
