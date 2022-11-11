@@ -196,6 +196,13 @@ class LSTM_VAE(nn.Module):
         self.encoder = Encoder_vae(self.seq_in, self.no_features, self.embedding_dim, self.latent_dim, self.n_layers)
         self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
 
+        self.apply(self.weight_init)
+    @staticmethod
+    def weight_init(m):
+        if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.zeros_(m.bias)
+
     def sample(self, mu, sigma):
         std = sigma
         eps = torch.randn_like(std)
@@ -232,8 +239,8 @@ class LSTM_VAE(nn.Module):
         self.load_state_dict(torch.load(PATH))
 
 
-def train_vae(no_features, train_iter, test_iter, model, optimizer,
-          device, out_dir, model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=100):
+def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
+          device, out_dir, model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=100, kld_factor = 1):
 
     """
     Training function.
@@ -246,8 +253,6 @@ def train_vae(no_features, train_iter, test_iter, model, optimizer,
         optimizer: optimizer to use
         config:
     """
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -256,12 +261,11 @@ def train_vae(no_features, train_iter, test_iter, model, optimizer,
         Nf_binomial = 0
 
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
-
-    global_step, logging_loss = 0, 0.0
     train_loss = 0.0
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
+        train_loss = 0.0
+        train_steps = 0
         for i, batch in tqdm(enumerate(train_iter), total=len(train_iter), unit="batch"):
             model.train()
             optimizer.zero_grad()
@@ -271,14 +275,10 @@ def train_vae(no_features, train_iter, test_iter, model, optimizer,
             recon_loss = loss_function(x, pars, Nf_lognorm,
                                        Nf_binomial).mean()
             log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
-            #recon_loss = criterion(y.to(device), batch[1].to(device))
 
-            #KLD = KL_loss_forVAE(mu, sigma).mean()
-            #KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
-            #KLD = -torch.sum(KL_mvn(mu, var))
             KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp()) ### Try with this one
 
-            loss = recon_loss + 1 * KLD  # the mean of KL is added to the mean of MSE
+            loss = recon_loss +  kld_factor * KLD  # the sum of KL is added to the mean of MSE
             loss.backward()
 
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
@@ -294,33 +294,45 @@ def train_vae(no_features, train_iter, test_iter, model, optimizer,
                 print(loss.item())
 
         model.eval()
+        val_steps = 0
+        temp_val_loss = 0
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
-                with torch.no_grad():
-                    x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
 
-                    recon_loss = loss_function(x, pars, Nf_lognorm,
-                                               Nf_binomial).mean()
-                    #recon_loss = criterion(y.to(device), batch[1].to(device))
-                    #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
+                x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
 
-                    #KLD = -torch.sum(KL_mvn(mu, var))
-                    #KLD = KL_loss_forVAE(mu, sigma).mean()
-                    #KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
-                    log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
-                    # recon_loss = criterion(y.to(device), batch[1].to(device))
+                recon_loss = loss_function(x, pars, Nf_lognorm,
+                                           Nf_binomial).mean()
+                #recon_loss = criterion(y.to(device), batch[1].to(device))
+                #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
 
-                    # KLD = KL_loss_forVAE(mu, sigma).mean()
-                    # KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
-                    # KLD = -torch.sum(KL_mvn(mu, var))
-                    KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
-                    loss = recon_loss + 1 * KLD  # the mean of KL is added to the mean of MSE
+                #KLD = -torch.sum(KL_mvn(mu, var))
+                #KLD = KL_loss_forVAE(mu, sigma).mean()
+                #KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
+                log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
+                # recon_loss = criterion(y.to(device), batch[1].to(device))
+
+                # KLD = KL_loss_forVAE(mu, sigma).mean()
+                # KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
+                # KLD = -torch.sum(KL_mvn(mu, var))
+                KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
+                loss = recon_loss +  kld_factor * KLD  # the sum of KL is added to the mean of MSE
+
+                temp_val_loss += loss
+                val_steps += 1
+
+            temp_val_loss = temp_val_loss / val_steps
+            print('eval loss {}'.format(temp_val_loss))
+            if temp_val_loss < val_loss:
+                print('val_loss improved from {} to {}, saving model  {} to {}' \
+                      .format(val_loss, temp_val_loss, model_name, out_dir))
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'param_conf': param_conf,
+                }, out_dir + '/{}.pth'.format(model_name))
+                #torch.save(model, out_dir + '{}.pth'.format(model_name))
+                val_loss = temp_val_loss
 
             print('eval loss {}'.format(val_loss))
-
-            loss = loss / len(test_iter)
-            if loss < val_loss:
-                print('val_loss improved from {} to {}, saving model to {}' \
-                      .format(val_loss, loss, out_dir))
-                torch.save(model, out_dir + '{}.pth'.format(model_name))
-                val_loss = loss

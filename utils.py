@@ -83,6 +83,25 @@ def KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior):
     #kl_loss += K.log(K.tf.divide(sigma_prior, sigma)) -1
     return 0.5 * torch.sum(kl_loss, axis=-1)
 
+#def KL_loss(mean, sigma):
+#    log_std = torch.log(sigma)
+#    kl_loss = 0.5 * torch.sum(1 + log_std - mean ** 2 - torch.exp(log_std), dim=1)
+#    return kl_loss
+
+def KL_loss(mu, log_var):
+    kl = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    kl = kl.sum(-1)     # to go from multi-dimensional z to single dimensional z : (batch_size x latent_size) ---> (batch_size)
+                            # i.e Z = [ [z1_1, z1_2 , ...., z1_lt] ] ------> z = [ z1]
+                            #         [ [z2_1, z2_2, ....., z2_lt] ]             [ z2]
+                            #                   .                                [ . ]
+                            #                   .                                [ . ]
+                            #         [[zn_1, zn_2, ....., zn_lt] ]              [ zn]
+
+                            #        lt=latent_size
+    kl = kl.mean()
+
+    return kl
+
 def loss_function(x, pars, Nf_lognorm, Nf_binomial):
     recon_loss = RecoProb_forVAE(x, pars[0], pars[1], pars[2], Nf_lognorm, Nf_binomial)
     return recon_loss

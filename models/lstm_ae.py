@@ -38,13 +38,20 @@ class Encoder(nn.Module):
         )
         self.enc = nn.Linear(embedding_size, self.latent_dim)
 
+        self.apply(self.weight_init)
+    @staticmethod
+    def weight_init(m):
+        if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.zeros_(m.bias)
+
     def forward(self, x):
         # Inputs: input, (h_0, c_0). -> If (h_0, c_0) is not provided, both h_0 and c_0 default to zero.
         # x is the output and so the size is > (batch, seq_len, hidden_size)
         # x, (_,_) = self.LSTM1(x)
         x, (hidden_state, cell_state) = self.LSTMenc(x)
         x, (hidden_state, cell_state) = self.LSTM1(x) ### to switch to x because it needs repeated sequence
-        # x[0,-1,:]==hidden_state[-1,0,:] with x ([32, 10, 64]) and h_state 1, 32, 64])
+        #  ht[:,0,:] == x[0, -1, :] (or also x[0,-1,:]==hidden_state[-1,0,:]) with x ([32, 10, 64]) and h_state ([1, 32, 64])
         last_lstm_layer_hidden_state = hidden_state[-1, :, :] #take only the last layer
         #we need hidden state only here because is like our encoding of the time series
         enc = self.enc(last_lstm_layer_hidden_state)
@@ -77,6 +84,13 @@ class Decoder(nn.Module):
         )
         self.fc = nn.Linear(self.hidden_size, output_size)
 
+        self.apply(self.weight_init)
+    @staticmethod
+    def weight_init(m):
+        if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.zeros_(m.bias)
+
     def forward(self, x):
         x = x.unsqueeze(1).repeat(1, self.seq_len, 1) # x[0,0,:]==x[0,1,:] ## we nedd to repeat to have an output of secquences (how is our target)
         x, (hidden_state, cell_state) = self.LSTMdec(x)
@@ -106,6 +120,7 @@ class LSTM_AE(nn.Module):
         self.decoder = Decoder(self.seq_out, self.embedding_dim,
                                self.output_size, self.latent_dim, self.n_layers)
 
+
     def forward(self, x):
         torch.manual_seed(0)
         encoded = self.encoder(x)
@@ -123,16 +138,9 @@ class LSTM_AE(nn.Module):
         squeezed_decoded = decoded.squeeze()
         return squeezed_decoded
 
-    def load(self, PATH):
-        """
-        Loads the model's parameters from the path mentioned
-        :param PATH: Should contain pickle file
-        :return: None
-        """
-        self.is_fitted = True
-        self.load_state_dict(torch.load(PATH))
 
-def train_ae(param_conf, train_iter, test_iter, model, criterion, optimizer,device,
+def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
+                  device,
            out_dir, model_name, epochs=100):
     """
     Training function.
@@ -148,8 +156,6 @@ def train_ae(param_conf, train_iter, test_iter, model, criterion, optimizer,devi
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
@@ -182,22 +188,22 @@ def train_ae(param_conf, train_iter, test_iter, model, criterion, optimizer,devi
         temp_val_loss = 0
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
-                with torch.no_grad():
-                    x_o, enc, y_o = model(batch[0].to(device))
-                    loss = criterion(x_o.to(device), y_o.to(device)).item()
-                    temp_val_loss += loss
-                    val_steps += 1
+
+                x_o, enc, y_o = model(batch[0].to(device))
+                loss = criterion(y_o.to(device), batch[1].to(device)).item()
+                temp_val_loss += loss
+                val_steps += 1
 
             temp_val_loss= temp_val_loss / val_steps
             print('eval loss {}'.format(temp_val_loss))
             if temp_val_loss < val_loss:
-                print('val_loss improved from {} to {}, saving model to {}' \
-                      .format(val_loss, temp_val_loss, out_dir))
+                print('val_loss improved from {} to {}, saving model  {} to {}' \
+                      .format(val_loss, temp_val_loss, model_name, out_dir))
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'param_conf': param_conf,
-                }, out_dir + '{}.pth'.format(model_name))
+                }, out_dir + '/{}.pth'.format(model_name))
                 #torch.save(model, out_dir + '{}.pth'.format(model_name))
                 val_loss = temp_val_loss
