@@ -220,8 +220,8 @@ class LSTM_VAE(nn.Module):
 
     def encode(self, x):
         self.eval()
-        mu, log_var = self.encoder(x)
-        return mu, log_var
+        mu, sigma = self.encoder(x)
+        return mu, sigma
 
     def decode(self, x):
         self.eval()
@@ -274,11 +274,13 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
 
             recon_loss = loss_function(x, pars, Nf_lognorm,
                                        Nf_binomial).mean()
-            log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
+            # KLD = KL_loss_forVAE(mu, sigma).mean()
+            KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
-            KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp()) ### Try with this one
+            # log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
+            # KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
+            loss = recon_loss + kld_factor * KLD  # the sum of KL is added to the mean of MSE
 
-            loss = recon_loss +  kld_factor * KLD  # the sum of KL is added to the mean of MSE
             loss.backward()
 
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
@@ -303,19 +305,12 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
 
                 recon_loss = loss_function(x, pars, Nf_lognorm,
                                            Nf_binomial).mean()
-                #recon_loss = criterion(y.to(device), batch[1].to(device))
-                #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
 
-                #KLD = -torch.sum(KL_mvn(mu, var))
                 #KLD = KL_loss_forVAE(mu, sigma).mean()
-                #KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
-                log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
-                # recon_loss = criterion(y.to(device), batch[1].to(device))
+                KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
-                # KLD = KL_loss_forVAE(mu, sigma).mean()
-                # KLD = KL_loss_forVAE_2(mu, sigma, mu_prior, sigma_prior).mean()
-                # KLD = -torch.sum(KL_mvn(mu, var))
-                KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
+                #log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
+                #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
                 loss = recon_loss +  kld_factor * KLD  # the sum of KL is added to the mean of MSE
 
                 temp_val_loss += loss

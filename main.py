@@ -146,7 +146,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_vae_vanilla', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
+    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
     parser1.add_argument("--columns", default=columns, help="columns imported from config")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
