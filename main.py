@@ -103,7 +103,9 @@ def main(args1, args2):
                         n_layers=args1.n_layers).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
+        #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=args1.patience,
+        #                                                       threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=9e-8, verbose=True)
         train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
 
@@ -113,7 +115,7 @@ def main(args1, args2):
                         Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         train_lstm_vae(param_conf, n_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
                   device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
                        Nf_lognorm=None, Nf_binomial=None, kld_factor = 1)
@@ -124,7 +126,7 @@ def main(args1, args2):
                          n_layers=args1.n_layers).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
 
         train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
                   device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
@@ -135,7 +137,8 @@ def main(args1, args2):
                         kernel_size=args1.kernel_size, filter_num=args1.filter_num,
                  latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
+        #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
         criterion = nn.MSELoss()
 
         train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
@@ -145,7 +148,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='conv_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
+    parser1.add_argument("--architecture", default='lstm_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
     parser1.add_argument("--columns", default=columns, help="columns imported from config")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
@@ -155,8 +158,9 @@ if __name__ == '__main__':
     parser1.add_argument("--dataset_subset", default=10000, help="number of row to use from all the dataset")
     parser1.add_argument("--batch_size", default=10, help="batch size")
     parser1.add_argument("--epochs", default=100, help="ns")
+    parser1.add_argument("--patience", default=5, help="ns")
     parser1.add_argument("--lr", default=0.001, help="nus")
-    parser1.add_argument("--embedding_dim", default=64, help="s")
+    parser1.add_argument("--embedding_dim", default=32, help="s")
     parser1.add_argument("--latent_dim", default=10, help="")
 
     parser1.add_argument("--out_window", default=16, help="sequence lenght of the output")

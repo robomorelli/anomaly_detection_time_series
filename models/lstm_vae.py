@@ -288,7 +288,6 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
 
             # if (i + 1) % config['gradient_accumulation_steps'] == 0:
             optimizer.step()
-            scheduler.step()
 
             if i % 100 == 0:
                 print("Loss:")
@@ -317,6 +316,7 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
                 val_steps += 1
 
             temp_val_loss = temp_val_loss / val_steps
+            scheduler.step()
             print('eval loss {}'.format(temp_val_loss))
             if temp_val_loss < val_loss:
                 print('val_loss improved from {} to {}, saving model  {} to {}' \

@@ -175,7 +175,6 @@ def train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
 
             # if (i + 1) % config['gradient_accumulation_steps'] == 0:
             optimizer.step()
-            scheduler.step()
 
             if i % 10 == 0:
                 print("Loss:")
@@ -196,6 +195,7 @@ def train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
 
             temp_val_loss= temp_val_loss / val_steps
             print('eval loss {}'.format(temp_val_loss))
+            scheduler.step()
             if temp_val_loss < val_loss:
                 print('val_loss improved from {} to {}, saving model  {} to {}' \
                       .format(val_loss, temp_val_loss, model_name, out_dir))

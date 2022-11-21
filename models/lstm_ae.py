@@ -155,7 +155,6 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
@@ -175,7 +174,6 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
 
             # if (i + 1) % config['gradient_accumulation_steps'] == 0:
             optimizer.step()
-            scheduler.step()
 
             if i % 10 == 0:
                 print("Loss:")
@@ -195,6 +193,7 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
                 val_steps += 1
 
             temp_val_loss= temp_val_loss / val_steps
+            scheduler.step()
             print('eval loss {}'.format(temp_val_loss))
             if temp_val_loss < val_loss:
                 print('val_loss improved from {} to {}, saving model  {} to {}' \
