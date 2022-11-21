@@ -120,7 +120,6 @@ class LSTM_AE(nn.Module):
         self.decoder = Decoder(self.seq_out, self.embedding_dim,
                                self.output_size, self.latent_dim, self.n_layers)
 
-
     def forward(self, x):
         torch.manual_seed(0)
         encoded = self.encoder(x)
@@ -144,7 +143,6 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
            out_dir, model_name, epochs=100):
     """
     Training function.
-
     Args:
         train_iter: (DataLoader): train data iterator
         test_iter: (DataLoader): test data iterator
@@ -156,6 +154,8 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
+
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
