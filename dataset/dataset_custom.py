@@ -39,25 +39,36 @@ class Dataset_seq(Dataset):
                 indexes = list(range(idx, idx + self.sequence_length))
                 indexes_out = list(range(idx + self.sequence_length, idx + self.sequence_length + self.out_window))
         else:
-            if (idx + self.sequence_length) > len(self.df_data):
-                indexes = list(range(len(self.df_data) - self.sequence_length, len(self.df_data)))
+            if self.forecast:
+                if (idx + self.sequence_length + self.out_window) > len(self.df_data):
+                    indexes = list(range(len(self.df_data) - self.sequence_length, len(self.df_data)))
+                    indexes_out = list(range(len(self.df_data), len(self.df_data) + self.out_window))
+                else:
+                    indexes = list(range(idx, idx + self.sequence_length))
+                    indexes_out = list(range(idx + self.sequence_length, idx + self.sequence_length + self.out_window))
             else:
-                indexes = list(range(idx, idx + self.sequence_length))
+                if (idx + self.sequence_length) > len(self.df_data):
+                    indexes = list(range(len(self.df_data) - self.sequence_length, len(self.df_data)))
+                else:
+                    indexes = list(range(idx, idx + self.sequence_length))
 
-            #if (idx + self.out_window) > len(self.df_data):
-            #    indexes_out = list(range(len(self.df_data) - self.out_window, len(self.df_data)))
-            #else:
-            #    indexes_out = list(range(idx, idx + self.out_window))
-            indexes_out = indexes[-self.out_window:]
+                if (idx + self.out_window) > len(self.df_data):
+                    indexes_out = list(range(len(self.df_data) - self.out_window, len(self.df_data)))
+                else:
+                    indexes_out = list(range(idx, idx + self.out_window))
 
-        data = self.df_data.iloc[indexes, :].values
-        target = self.targets.iloc[indexes_out].values
+                #indexes_out = indexes[-self.out_window:]
 
-        if self.transform is not None:
-            data = self.transform(data)
-            target = self.transform(target)
+            data = self.df_data.iloc[indexes, :].values
+            target = self.targets.iloc[indexes_out].values
 
-            #data = np.transpose(data, (1,0))
-            #target = np.transpose(target, (1,0))
+            if self.transform is not None:
+                data = self.transform(data)
+                target = self.transform(target)
 
-        return torch.tensor(data).float(), torch.tensor(target).float(), idx  #torch.from_numpy(x).float()
+        return torch.tensor(data).float(), torch.tensor(target).float()
+
+
+
+
+

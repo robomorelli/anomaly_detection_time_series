@@ -48,9 +48,9 @@ def main(args1, args2):
     if args1.architecture == "conv_ae":
         transform = T.Compose([
                                T.ToTensor(),
-                               #T.Lambda(lambda x: x.permute(0, 2, 1))
                                ])
-        args1.out_window = args1.sequence_length
+        #args1.out_window = args1.sequence_length
+        #transform = None
     else:
         transform = None
 
@@ -70,22 +70,21 @@ def main(args1, args2):
                                 out_window = args1.out_window, prediction=args1.predict, transform=transform)
     test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=False)
 
-
     if 'conv' not in args1.architecture:
         if args1.scaled:
             if not args1.shuffle:
-                torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}_sr_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_{}_ft_{}_sr_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(test_iter, './dataloader/test_dataloader_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
             else:
-                torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}_sr_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_{}_ft_{}_sr_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(test_iter, './dataloader/test_dataloader_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
         else:
             if not args1.shuffle:
-                torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}_sr_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}_sr_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(test_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
             else:
-                torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}_sr_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}_sr_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+                torch.save(test_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
 
     if args1.target != None:
         n_features = len(args1.columns) - len(args1.target)
@@ -146,25 +145,25 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
+    parser1.add_argument("--architecture", default='lstm_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
     parser1.add_argument("--columns", default=columns, help="columns imported from config")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
     parser1.add_argument('--shuffle', action='store_const', const=False, default=False,
                         help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
-    parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
-    parser1.add_argument("--batch_size", default=20, help="batch size")
+    parser1.add_argument("--dataset_subset", default=10000, help="number of row to use from all the dataset")
+    parser1.add_argument("--batch_size", default=10, help="batch size")
     parser1.add_argument("--epochs", default=100, help="ns")
     parser1.add_argument("--lr", default=0.001, help="nus")
     parser1.add_argument("--embedding_dim", default=64, help="s")
-    parser1.add_argument("--latent_dim", default=100, help="")
+    parser1.add_argument("--latent_dim", default=10, help="")
 
     parser1.add_argument("--out_window", default=5, help="sequence lenght of the output")
     parser1.add_argument("--sequence_length", default=5, help="sequence_lenght")
     parser1.add_argument("--n_layers", default=1, help="")
     parser1.add_argument("--kernel_size", default=3, help="")
-    parser1.add_argument("--filter_num", default=32, help="")
+    parser1.add_argument("--filter_num", default=64, help="")
     parser1.add_argument("--activation", default=nn.ReLU(), help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
@@ -179,11 +178,18 @@ if __name__ == '__main__':
     parser2 = argparse.ArgumentParser()
     parser2.add_argument("--data_path", type=str, default=f'./data/FIORIRE/dataset_{args1.sampling_rate}/')
     parser2.add_argument("--dataset", default=f'all_2016-2018_clean_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
+
+    n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
     if args1.scaled:
-        parser2.add_argument("--model_name", default='{}_{}_ft_{}_sc'.format(args1.architecture, len(args1.columns), args1.sampling_rate),
+
+        parser2.add_argument("--model_name", default='{}_{}_ft_{}_sc'.format(args1.architecture, n_features, args1.sampling_rate),
                              help="ae")
     else:
-        parser2.add_argument("--model_name", default='{}_{}_ft_{}'.format(args1.architecture, len(args1.columns), args1.sampling_rate), help="ae")
+        parser2.add_argument("--model_name", default='{}_{}_ft_{}'.format(args1.architecture, n_features, args1.sampling_rate), help="ae")
     args2 = parser2.parse_args()
 
+    args1.out_window = args1.sequence_length
     main(args1, args2)
+    # Recurrent ISSUE:
+    # When size in the loss between yo and x does not match the reason is the input size that when reduced with conv layer end witha  dimension
+    # that is not equal to input size >>> sequence length X features have to be 16X16
