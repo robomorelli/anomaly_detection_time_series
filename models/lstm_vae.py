@@ -282,7 +282,6 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
             loss = recon_loss + kld_factor * KLD  # the sum of KL is added to the mean of MSE
 
             loss.backward()
-
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
             train_loss += loss.item()
 

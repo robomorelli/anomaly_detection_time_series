@@ -121,7 +121,7 @@ class CONV_AE(nn.Module):
         self.h = heigth  # number of features (to transpose respect to the df format)
         self.w = width  # sequence length (to transpose respect to the df format)
 
-        self.filter_num_list = [self.filter_num * ((ix + 1)*2) for ix in range(self.n_layers-1)]
+        self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
         self.filter_num_list = [self.in_channel] + [self.filter_num] + self.filter_num_list
 
         self.encoder = Encoder(self.in_channel, kernel_size=3, filter_num_list=self.filter_num_list,
@@ -132,7 +132,7 @@ class CONV_AE(nn.Module):
                                latent_dim=self.latent_dim, flattened_size=self.flattened_size,
                                img_heigth=self.h, img_width=self.w, h_enc=self.encoder.h_enc, w_enc=self.encoder.w_enc)
 
-
+        print(self)
     def forward(self, x):
         enc = self.encoder(x)
         out = self.decoder(enc)

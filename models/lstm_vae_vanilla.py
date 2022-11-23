@@ -37,8 +37,10 @@ class Encoder_vaev(nn.Module):
             batch_first=True
         )
 
-        self.mu = nn.Linear(embedding_size, latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
-        self.log_var = nn.Linear(embedding_size, latent_dim)
+        #self.mu = nn.Linear(embedding_size, latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
+        #self.log_var = nn.Linear(embedding_size, latent_dim)
+        self.mu = LinConstr(embedding_size, latent_dim)
+        self.log_var= LinConstr(embedding_size, latent_dim)
 
         self.act2 = InverseSquareRootLinearUnit()
 
@@ -65,7 +67,6 @@ class Encoder_vaev(nn.Module):
         # fc layer input (input_size, output_size) but if you have (batch, seq_len, input_size) it takes the same operation batch by bath and for
         # each sequence
         mu = self.mu(last_lstm_layer_hidden_state)
-        #sigma = self.act2(self.sigma(last_lstm_layer_hidden_state))
         log_var = self.log_var(last_lstm_layer_hidden_state)
         return mu, log_var
 
@@ -110,9 +111,63 @@ class Decoder_vaev(nn.Module):
         out = self.out(x)
         return out
 
+class Decoder_vae(nn.Module):
+    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers=1):
+        super().__init__()
+
+        self.seq_len = seq_out
+        self.embedding_size = embedding_size
+        self.hidden_size = (2 * embedding_size)
+        self.n_layers = n_layers
+        self.output_size = output_size
+        self.latent_dim = latent_dim
+        self.Nf_lognorm = output_size
+
+        self.act2 = InverseSquareRootLinearUnit()
+        self.act3 = ClippedTanh()
+
+        self.LSTMdec = nn.LSTM(
+            input_size=latent_dim,
+            hidden_size=embedding_size,
+            num_layers=n_layers,
+            batch_first=True
+        )
+        self.LSTM1 = nn.LSTM(
+            input_size=embedding_size,
+            hidden_size=self.hidden_size,
+            num_layers=n_layers,
+            batch_first=True
+        )
+
+        #clipper = WeightClipper()
+        #self.LSTMdec.apply(clipper)
+
+        #self.fc = nn.Linear(self.hidden_size, self.output_size)
+
+        self.par1 = nn.Linear(self.hidden_size, output_size)
+        self.par2 = nn.Linear(self.hidden_size, self.Nf_lognorm)
+        self.par3 = nn.Linear(self.hidden_size, self.Nf_lognorm)
+
+    def forward(self, z):
+
+        z = z.unsqueeze(1).repeat(1, self.seq_len, 1) #x[0,0,:]==x[0,1,:] ## we nedd to repeat to have an output of secquences (how is our target)
+        x, (hidden_state, cell_state) = self.LSTMdec(z)
+        x, (_, _) = self.LSTM1(x)
+        x = x.reshape((-1, self.seq_len, self.hidden_size))    #fc layer input (input_size, output_size) but if you have (batch, seq_len, input_size) it takes the same operation batch by bath and for
+        # each sequence
+        # we use the output to target a regression o a label
+        # out = self.fc(x) #it needs ([32, n, 64]) because in the next operation needs to output a sequence of n
+                        #if you don't reshape with sequence lenght in dimension 1 we don'n have out.size = [batch,n , n_features)
+                        #also for this we need: x = x.unsqueeze(1).repeat(1, self.seq_len, 1) >>> lstm output >>> reshape
+        par2 = self.par2(x)
+        par3 = self.par3(x)
+
+        return self.par1(x), self.act2(par2), self.act3(par3)
+
 class LSTM_VAEV(nn.Module):
     def __init__(self, seq_in, seq_out, no_features, output_size
-                 , embedding_dim, latent_dim, n_layers):
+                 , embedding_dim, latent_dim,
+                 n_layers):
         super().__init__()
 
         self.seq_in = seq_in
@@ -125,7 +180,8 @@ class LSTM_VAEV(nn.Module):
         self.latent_dim = latent_dim
 
         self.encoder = Encoder_vaev(self.seq_in, self.no_features, self.embedding_dim, self.latent_dim, self.n_layers)
-        self.decoder = Decoder_vaev(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
+        #self.decoder = Decoder_vaev(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
+        self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
 
         self.apply(self.weight_init)
 
@@ -140,14 +196,22 @@ class LSTM_VAEV(nn.Module):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def forward(self, x):
-        #torch.manual_seed(0)
-        mu, log_var = self.encoder(x)
-        #sigma = torch.exp(0.5*log_var)
-        z = self.sample(mu, log_var)
-        out = self.decoder(z)
+    #def forward(self, x):
+        ##torch.manual_seed(0)
+        #mu, log_var = self.encoder(x)
+        ##sigma = torch.exp(0.5*log_var)
+        #z = self.sample(mu, log_var)
+        #out = self.decoder(z)
 
-        return x, mu, log_var, out
+        #return x, mu, log_var, out
+
+    def forward(self, x):
+        torch.manual_seed(0)
+        mu, log_var = self.encoder(x)
+        z = self.sample(mu, log_var)
+        pars = self.decoder(z)
+
+        return x, mu, log_var, pars
 
     def encode(self, x):
         self.eval()
@@ -170,8 +234,8 @@ class LSTM_VAEV(nn.Module):
         self.load_state_dict(torch.load(PATH))
 
 
-def train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
-          device, out_dir, model_name, epochs=100, kld_factor = 1):
+def train_lstm_vae_vanilla(param_conf, no_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
+          device, out_dir, model_name, Nf_lognorm=None, Nf_binomial=None, epochs=100, kld_factor = 1):
 
     """
     Training function.
@@ -187,6 +251,10 @@ def train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    if Nf_lognorm == None:
+        Nf_lognorm = no_features
+        Nf_binomial = 0
+
     train_loss = 0.0
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
@@ -196,9 +264,13 @@ def train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, 
             model.train()
             optimizer.zero_grad()
 
-            x, mu, log_var, y = model(batch[0].to(device))
+            #x, mu, log_var, y = model(batch[0].to(device))
+            #recon_loss = criterion(y.to(device), x.to(device))
 
-            recon_loss = criterion(y.to(device), x.to(device))
+            x, mu, log_var, pars = model(batch[0].to(device))
+            recon_loss = loss_function(x, pars, Nf_lognorm,
+                                       Nf_binomial).mean()
+
             KLD = KL_loss(mu, log_var)
 
             loss = recon_loss + kld_factor * KLD.mean()  # the sum of KL is added to the mean of MSE
@@ -212,7 +284,7 @@ def train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, 
 
             if i % 100 == 0:
                 print("Loss:")
-                print("kld {}".format(KLD.mean()))
+                print("kld {} recton loss {}".format(KLD.mean(), recon_loss))
                 print(loss.item())
 
         model.eval()
@@ -221,10 +293,15 @@ def train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, 
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
 
-                x, mu, log_var, y = model(batch[0].to(device))
+                #x, mu, log_var, y = model(batch[0].to(device))
 
-                recon_loss = criterion(y.to(device), x.to(device))
+                #recon_loss = criterion(y.to(device), x.to(device))
+
+                x, mu, log_var, pars = model(batch[0].to(device))
+                recon_loss = loss_function(x, pars, Nf_lognorm,
+                                           Nf_binomial).mean()
                 KLD = KL_loss(mu, log_var)
+
 
                 loss = recon_loss + kld_factor * KLD  # the sum of KL is added to the mean of MSE
 

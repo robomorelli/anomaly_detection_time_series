@@ -113,24 +113,25 @@ def main(args1, args2):
         model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
                         Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
-        criterion = nn.MSELoss()
+        criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         train_lstm_vae(param_conf, n_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
                   device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
-                       Nf_lognorm=None, Nf_binomial=None, kld_factor = 1)
+                       Nf_lognorm=None, Nf_binomial=None, kld_factor = 0.01)
 
     elif args1.architecture == "lstm_vae_vanilla":
         model = LSTM_VAEV(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
                          n_layers=args1.n_layers).to(device)
-        criterion = nn.MSELoss()
+        #criterion = nn.MSELoss()
+        criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
 
-        train_lstm_vae_vanilla(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
+        train_lstm_vae_vanilla(param_conf, n_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
                   device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
-                        kld_factor = 1)
+                Nf_lognorm=None, Nf_binomial=None, kld_factor = 0.01)
 
     elif args1.architecture == "conv_ae":
         model = CONV_AE(in_channel=1,  heigth=args1.sequence_length, width=len(args1.columns),
@@ -148,26 +149,25 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
+    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
     parser1.add_argument("--columns", default=columns, help="columns imported from config")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
-    parser1.add_argument('--shuffle', action='store_const', const=False, default=False,
-                        help='')
+    parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
     parser1.add_argument("--dataset_subset", default=10000, help="number of row to use from all the dataset")
     parser1.add_argument("--batch_size", default=10, help="batch size")
-    parser1.add_argument("--epochs", default=100, help="ns")
+    parser1.add_argument("--epochs", default=300, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
-    parser1.add_argument("--lr", default=0.001, help="nus")
-    parser1.add_argument("--embedding_dim", default=32, help="s")
-    parser1.add_argument("--latent_dim", default=10, help="")
+    parser1.add_argument("--lr", default=0.003, help="nus")
+    parser1.add_argument("--embedding_dim", default=64, help="s")
+    parser1.add_argument("--latent_dim", default=40, help="")
 
-    parser1.add_argument("--out_window", default=16, help="sequence lenght of the output")
-    parser1.add_argument("--sequence_length", default=16, help="sequence_lenght")
-    parser1.add_argument("--n_layers", default=1, help="")
+    parser1.add_argument("--out_window", default=5, help="sequence lenght of the output")
+    parser1.add_argument("--sequence_length", default=5, help="sequence_lenght")
+    parser1.add_argument("--n_layers", default=4, help="")
     parser1.add_argument("--kernel_size", default=3, help="")
-    parser1.add_argument("--filter_num", default=64, help="")
+    parser1.add_argument("--filter_num", default=128, help="")
     parser1.add_argument("--activation", default=nn.ReLU(), help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")

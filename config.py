@@ -10,10 +10,10 @@ model_results = os.path.join(root, 'model_results/')
 data_path = os.path.join(root, 'data/')
 
 
-columns = ['RW1_motcurr', 'RW2_motcurr', 'RW3_motcurr', 'RW4_motcurr', 'RW1_therm',
-       'RW2_therm', 'RW3_therm', 'RW4_therm', 'RW1_speed', 'RW2_speed',
-       'RW3_speed', 'RW4_speed', 'RW1_cmd_volt', 'RW2_cmd_volt',
-       'RW3_cmd_volt', 'RW4_cmd_volt']
+columns = ['RW1_motcurr', 'RW1_therm', 'RW1_speed', 'RW1_cmd_volt', 'RW2_cmd_volt',
+       'RW3_cmd_volt', 'RW4_cmd_volt', 'RW2_motcurr', 'RW3_motcurr', 'RW4_motcurr',
+       'RW2_therm', 'RW3_therm', 'RW4_therm', 'RW2_speed',
+       'RW3_speed', 'RW4_speed']
 
 #['RW1_motcurr', 'RW2_motcurr', 'RW3_motcurr', 'RW4_motcurr', 'RW1_therm',
 #'RW2_therm', 'RW3_therm', 'RW4_therm', 'RW1_speed', 'RW2_speed',

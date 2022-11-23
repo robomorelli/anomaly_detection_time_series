@@ -52,12 +52,7 @@ class Dataset_seq(Dataset):
                 else:
                     indexes = list(range(idx, idx + self.sequence_length))
 
-                if (idx + self.out_window) > len(self.df_data):
-                    indexes_out = list(range(len(self.df_data) - self.out_window, len(self.df_data)))
-                else:
-                    indexes_out = list(range(idx, idx + self.out_window))
-
-                #indexes_out = indexes[-self.out_window:]
+                indexes_out = indexes[-self.out_window:]
 
             data = self.df_data.iloc[indexes, :].values
             target = self.targets.iloc[indexes_out].values
