@@ -95,7 +95,8 @@ class Decoder(nn.Module):
         x = x.unsqueeze(1).repeat(1, self.seq_len, 1) # x[0,0,:]==x[0,1,:] ## we nedd to repeat to have an output of secquences (how is our target)
         x, (hidden_state, cell_state) = self.LSTMdec(x)
         x, (_, _) = self.LSTM1(x)
-        x = x.reshape((-1, self.seq_len, self.hidden_size))    #fc layer input (input_size, output_size) but if you have (batch, seq_len, input_size) it takes the same operation batch by bath and for
+        x = x.reshape((-1, self.seq_len, self.hidden_size))    #fc layer input (input_size, output_size) but if you have
+        # (batch, seq_len, input_size) it takes the same operation batch by bath and for
         # each sequence
         # we use the output to target a regression o a label
         out = self.fc(x) #it needs ([32, n, 64]) because in the next operation needs to output a sequence of n
