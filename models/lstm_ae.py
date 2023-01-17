@@ -14,26 +14,27 @@ torch.manual_seed(0)
 # code inspired by  https://github.com/shobrook/sequitur/blob/master/sequitur/autoencoders/rae.py
 # annotation sourced by  https://pytorch.org/docs/stable/nn.html#torch.nn.LSTM
 class Encoder(nn.Module):
-    def __init__(self, seq_in, n_features, embedding_size, latent_dim, n_layers=1):
+    def __init__(self, seq_in, n_features, embedding_size, latent_dim, n_layers_1=2, n_layers_2=1):
         super().__init__()
 
         # self.seq_len = seq_in
         self.n_features = n_features  # The number of expected features(= dimension size) in the input x
         self.embedding_size = embedding_size  # the number of features in the embedded points of the inputs' number of features
-        self.n_layers = n_layers
+        self.n_layers_1 = n_layers_1
+        self.n_layers_2 = n_layers_2
         self.hidden_size = (2 * embedding_size)  # The number of features in the hidden state h
         self.latent_dim = latent_dim
 
         self.LSTMenc = nn.LSTM(
             input_size=n_features,
             hidden_size=self.hidden_size,
-            num_layers=n_layers,
+            num_layers=n_layers_1,
             batch_first=True
         )
         self.LSTM1 = nn.LSTM(
             input_size=self.hidden_size,
             hidden_size=embedding_size,
-            num_layers=n_layers,
+            num_layers=n_layers_2,
             batch_first=True
         )
         self.enc = nn.Linear(embedding_size, self.latent_dim)
@@ -59,27 +60,28 @@ class Encoder(nn.Module):
 
 # (2) Decoder
 class Decoder(nn.Module):
-    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers=1):
+    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers_1=2, n_layers_2=1):
         super().__init__()
 
         self.seq_len = seq_out
         self.embedding_size = embedding_size
         self.hidden_size = (2 * embedding_size)
-        self.n_layers = n_layers
+        self.n_layers_1 = n_layers_1
+        self.n_layers_2 = n_layers_2
         self.output_size = output_size
         self.latent_dim = latent_dim
 
         self.LSTMdec = nn.LSTM(
             input_size=latent_dim,
             hidden_size=embedding_size,
-            num_layers=n_layers,
+            num_layers=n_layers_2,
             batch_first=True
         )
 
         self.LSTM1 = nn.LSTM(
             input_size=embedding_size,
             hidden_size=self.hidden_size,
-            num_layers=n_layers,
+            num_layers=n_layers_1,
             batch_first=True
         )
         self.fc = nn.Linear(self.hidden_size, output_size)
@@ -105,21 +107,23 @@ class Decoder(nn.Module):
         return out
 
 class LSTM_AE(nn.Module):
-    def __init__(self, seq_in = 7, seq_out = 7, n_features = 1, output_size=1, embedding_dim=64, latent_dim=50, n_layers=1):
+    def __init__(self, seq_in = 7, seq_out = 7, n_features = 1
+                 , output_size=1, embedding_dim=64, latent_dim=50, n_layers_1=2,  n_layers_2=1):
         super().__init__()
 
         self.seq_in = seq_in
         self.seq_out = seq_out
         self.n_features = n_features
         self.embedding_dim = embedding_dim
-        self.n_layers = n_layers
+        self.n_layers_1 = n_layers_1
+        self.n_layers_2 = n_layers_2
         self.output_size = output_size
         self.latent_dim = latent_dim
 
         self.encoder = Encoder(self.seq_in, self.n_features,
-                               self.embedding_dim, self.latent_dim, self.n_layers)
+                               self.embedding_dim, self.latent_dim, self.n_layers_1, self.n_layers_2)
         self.decoder = Decoder(self.seq_out, self.embedding_dim,
-                               self.output_size, self.latent_dim, self.n_layers)
+                               self.output_size, self.latent_dim, self.n_layers_1, self.n_layers_2)
 
     def forward(self, x):
         torch.manual_seed(0)
