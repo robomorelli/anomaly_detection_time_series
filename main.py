@@ -182,7 +182,7 @@ if __name__ == '__main__':
 
     parser1.add_argument("--out_window", default=16, help="sequence lenght of the output")
     parser1.add_argument("--sequence_length", default=16, help="sequence_lenght")
-    parser1.add_argument("--n_layers", default=2, help="")
+    parser1.add_argument("--n_layers", default=3, help="")
     parser1.add_argument("--kernel_size", default=3, help="")
     parser1.add_argument("--filter_num", default=40, help="")
     parser1.add_argument("--activation", default=nn.ReLU(), help="")
@@ -202,7 +202,7 @@ if __name__ == '__main__':
 
     n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
     if args1.scaled:
-        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_sc'.format(args1.architecture, args1.sequence_length, args1.embedding_dim),
+        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_nl_{}_sc'.format(args1.architecture, args1.sequence_length, args1.embedding_dim, args1.n_layers),
                              help="ae")
     else:
         parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}'.format(args1.architecture, args1.sequence_length, args1.embedding_dim), help="ae")
