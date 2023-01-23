@@ -1,6 +1,6 @@
 import os
 
-paths_to_exclude = ['data', 'dataloader', 'dataset', 'model_result', 'models', 'notebook']
+paths_to_exclude = ['data', 'dataloader', 'dataset', 'model_result', 'models', 'notebook', 'esa']
 paths = []
 root = os.getcwd()
 root_parts = root.split('/')
