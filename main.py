@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
-from dataset.dataset_custom import *
+from dataset.sentinel import *
 from models.lstm_ae import *
 from models.lstm_vae import *
 from models.lstm_vae_vanilla import *
@@ -10,19 +10,9 @@ from models.conv_ae import *
 from config import *
 import argparse
 from torchvision.transforms import transforms as T
-import random
-import numpy as np
-
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
 
 def main(args1, args2):
-    #random.seed(0)
-
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
-    print(len(xdf))
 
     if args1.columns_subset:
         args1.columns = args1.columns[:args1.columns_subset]
@@ -67,14 +57,9 @@ def main(args1, args2):
     param_conf = args1.__dict__
     param_conf.update(args2.__dict__)
 
-    #g = torch.Generator()
-    #g.manual_seed(0)
-
     train_dataset = Dataset_seq(df_train, target = args1.target, sequence_length = args1.sequence_length,
-                                out_window = args1.out_window, prediction=args1.predict, transform=transform, )
+                                out_window = args1.out_window, prediction=args1.predict, transform=transform)
     train_iter = DataLoader(dataset=train_dataset, batch_size=args1.batch_size, shuffle=True)
-                            #worker_init_fn=seed_worker,
-                            #generator=g)
 
     #######################################################
     # Check the index sampled with shuffle false or true:
@@ -84,8 +69,6 @@ def main(args1, args2):
     test_dataset = Dataset_seq(df_test, target = args1.target, sequence_length = args1.sequence_length,
                                 out_window = args1.out_window, prediction=args1.predict, transform=transform)
     test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=False)
-                           #,worker_init_fn=seed_worker,
-                           # generator=g)
 
     if 'conv' not in args1.architecture:
         if args1.scaled:
@@ -117,7 +100,7 @@ def main(args1, args2):
     if args1.architecture == "lstm_ae":
         model = LSTM_AE(seq_in=args1.sequence_length, seq_out= args1.out_window, n_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        n_layers=args1.n_layers).to(device)
+                        n_layers_1=args1.n_layers_1, n_layers_2=args1.n_layers_2).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
@@ -172,19 +155,21 @@ if __name__ == '__main__':
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
     parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
-    parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
-    parser1.add_argument("--batch_size", default=100, help="batch size")
-    parser1.add_argument("--epochs", default=300, help="ns")
+    parser1.add_argument("--dataset_subset", default=10000000, help="number of row to use from all the dataset")
+    parser1.add_argument("--batch_size", default=1000, help="batch size")
+    parser1.add_argument("--epochs", default=200, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
-    parser1.add_argument("--lr", default=0.001, help="nus")
+    parser1.add_argument("--lr", default=0.0009, help="nus")
     parser1.add_argument("--embedding_dim", default=8, help="s")
-    parser1.add_argument("--latent_dim", default=60, help="")
+    parser1.add_argument("--latent_dim", default=40, help="")
 
-    parser1.add_argument("--out_window", default=16, help="sequence lenght of the output")
-    parser1.add_argument("--sequence_length", default=16, help="sequence_lenght")
-    parser1.add_argument("--n_layers", default=3, help="")
+    parser1.add_argument("--out_window", default=7, help="sequence lenght of the output")
+    parser1.add_argument("--sequence_length", default=7, help="sequence_length")
+    parser1.add_argument("--n_layers", default=1, help="")
+    parser1.add_argument("--n_layers_1", default=2, help="")
+    parser1.add_argument("--n_layers_2", default=1, help="")
     parser1.add_argument("--kernel_size", default=3, help="")
-    parser1.add_argument("--filter_num", default=40, help="")
+    parser1.add_argument("--filter_num", default=128, help="")
     parser1.add_argument("--activation", default=nn.ReLU(), help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
@@ -201,8 +186,13 @@ if __name__ == '__main__':
     parser2.add_argument("--dataset", default=f'all_2016-2018_clean_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
 
     n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
+
     if args1.scaled:
-        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_nl_{}_sc'.format(args1.architecture, args1.sequence_length, args1.embedding_dim, args1.n_layers),
+        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_layers_{}_{}_sc'.format(args1.architecture
+                                                                                 , args1.sequence_length
+                                                                                 , args1.embedding_dim
+                                                                                 ,args1.n_layers_1
+                                                                                 ,args1.n_layers_2),
                              help="ae")
     else:
         parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}'.format(args1.architecture, args1.sequence_length, args1.embedding_dim), help="ae")
