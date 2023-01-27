@@ -1,4 +1,5 @@
 import pandas as pd
+import torch
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
@@ -7,9 +8,10 @@ from models.lstm_ae import *
 from models.lstm_vae import *
 from models.lstm_vae_vanilla import *
 from models.conv_ae import *
+from models.conv_ae_1D import *
 from config import *
 import argparse
-from torchvision.transforms import transforms as T
+from torchvision.transforms import transforms as T, Lambda
 
 def main(args1, args2):
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
@@ -49,8 +51,13 @@ def main(args1, args2):
         transform = T.Compose([
                                T.ToTensor(),
                                ])
-        #args1.out_window = args1.sequence_length
-        #transform = None
+    elif args1.architecture == 'conv_ae1D':
+        transform = T.Compose([
+            T.ToTensor(),
+            Lambda(lambda x: x.permute((0, 2, 1))),
+            Lambda(lambda x: x.squeeze())
+        ])
+
     else:
         transform = None
 
@@ -145,11 +152,23 @@ def main(args1, args2):
         train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
 
+    elif args1.architecture == "conv_ae1D":
+        model = CONV_AE1D(in_channel=16, width=len(args1.columns),
+                        kernel_size=args1.kernel_size, filter_num=args1.filter_num,
+                 latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
+        #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
+        criterion = nn.MSELoss()
+
+        train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
+              out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
+
 
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
+    parser1.add_argument("--architecture", default='conv_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
     parser1.add_argument("--columns", default=columns, help="columns imported from config")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
@@ -164,7 +183,7 @@ if __name__ == '__main__':
     parser1.add_argument("--latent_dim", default=40, help="")
 
     parser1.add_argument("--out_window", default=7, help="sequence lenght of the output")
-    parser1.add_argument("--sequence_length", default=7, help="sequence_length")
+    parser1.add_argument("--sequence_length", default=16, help="sequence_length")
     parser1.add_argument("--n_layers", default=1, help="")
     parser1.add_argument("--n_layers_1", default=2, help="")
     parser1.add_argument("--n_layers_2", default=1, help="")
