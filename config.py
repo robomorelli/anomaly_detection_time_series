@@ -7,6 +7,7 @@ root_parts = root.split('/')
 root = [x if x not in paths_to_exclude else '' for x in root_parts]
 root = '/'.join(root)
 model_results = os.path.join(root, 'model_results/')
+esa_exploration = os.path.join(model_results, 'esa_exploration/')
 data_path = os.path.join(root, 'data/')
 
 
