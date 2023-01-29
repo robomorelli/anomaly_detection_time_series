@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 from dataset.sentinel import *
 from models.lstm_ae import *
+from models.lstm import *
 from models.lstm_vae import *
 from models.lstm_vae_vanilla import *
 from models.conv_ae import *
@@ -65,16 +66,16 @@ def main(args1, args2):
     param_conf.update(args2.__dict__)
 
     train_dataset = Dataset_seq(df_train, target = args1.target, sequence_length = args1.sequence_length,
-                                out_window = args1.out_window, prediction=args1.predict, transform=transform)
+                                out_window = args1.out_window, prediction=args2.predict, forecast_all=args2.forecast_all,
+                                transform=transform)
     train_iter = DataLoader(dataset=train_dataset, batch_size=args1.batch_size, shuffle=True)
 
     #######################################################
     # Check the index sampled with shuffle false or true:
     # list(train_iter._index_sampler.sampler.__iter__())
     #######################################################
-
-    test_dataset = Dataset_seq(df_test, target = args1.target, sequence_length = args1.sequence_length,
-                                out_window = args1.out_window, prediction=args1.predict, transform=transform)
+    test_dataset = Dataset_seq(df_test, target = args1.target, sequence_length = args1.sequence_length, forecast_all=args2.forecast_all,
+                                out_window = args1.out_window, prediction=args2.predict, transform=transform)
     test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=False)
 
     if 'conv' not in args1.architecture:
@@ -111,10 +112,21 @@ def main(args1, args2):
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-        #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=args1.patience,
-        #                                                       threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=9e-8, verbose=True)
+
         train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
+
+    if args1.architecture == "lstm":
+        model = LSTM(seq_in=args1.sequence_length, seq_out= args1.out_window, n_features=n_features,
+                        output_size=len(target), embedding_dim=args1.embedding_dim,
+                        n_layers_1=args1.n_layers_1, n_layers_2=args1.n_layers_2).to(device)
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
+
+        train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
+              out_dir =checkpoint_path , model_name= args2.model_name, patience=args1.patience, epochs = args1.epochs)
+
 
     elif args1.architecture == "lstm_vae":
         model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
@@ -153,38 +165,41 @@ def main(args1, args2):
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
 
     elif args1.architecture == "conv_ae1D":
-        model = CONV_AE1D(in_channel=16, width=len(args1.columns),
+        model = CONV_AE1D(in_channel=len(df_train.columns), width=args1.sequence_length,
                         kernel_size=args1.kernel_size, filter_num=args1.filter_num,
                  latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-        #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=0.5)
         criterion = nn.MSELoss()
 
         train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
 
 
+
+
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='conv_ae', help="[lstm_ae, lstm_vae, lstm_vae_vanilla, conv_ae, conv_vae]")
+    parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
+                                                                " lstm_vae_vanilla, conv_ae, conv_ae1D,"
+                                                                " conv_vae]")
     parser1.add_argument("--columns", default=columns, help="columns imported from config")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
     parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
-    parser1.add_argument("--dataset_subset", default=10000000, help="number of row to use from all the dataset")
+    parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
     parser1.add_argument("--batch_size", default=1000, help="batch size")
     parser1.add_argument("--epochs", default=200, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
     parser1.add_argument("--lr", default=0.0009, help="nus")
     parser1.add_argument("--embedding_dim", default=8, help="s")
-    parser1.add_argument("--latent_dim", default=40, help="")
+    parser1.add_argument("--latent_dim", default=20, help="")
 
     parser1.add_argument("--out_window", default=7, help="sequence lenght of the output")
     parser1.add_argument("--sequence_length", default=16, help="sequence_length")
-    parser1.add_argument("--n_layers", default=1, help="")
+    parser1.add_argument("--n_layers", default=2, help="") # conv architecture
     parser1.add_argument("--n_layers_1", default=2, help="")
     parser1.add_argument("--n_layers_2", default=1, help="")
     parser1.add_argument("--kernel_size", default=3, help="")
@@ -193,28 +208,41 @@ if __name__ == '__main__':
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
     parser1.add_argument("--target", default=None, help="columns name of the target if none >>> autoencoder mode")
-    parser1.add_argument('--predict', action='store_const', const=False, default=False,
-                        help='')
+
+    parser1.add_argument("--sampling_rate", type=str, default="4s", help="[2s, 4s]")
     parser1.add_argument('--scaled', action='store_const', const=False, default=True,
                         help='')
-    parser1.add_argument("--sampling_rate", type=str, default="4s", help="[2s, 4s]")
+    parser1.add_argument('--forecast_all', action='store_true',
+                        help='')
     args1 = parser1.parse_args()
 
     parser2 = argparse.ArgumentParser()
     parser2.add_argument("--data_path", type=str, default=f'./data/FIORIRE/dataset_{args1.sampling_rate}/')
     parser2.add_argument("--dataset", default=f'all_2016-2018_clean_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
+    parser2.add_argument('--predict', action='store_true',
+                        help='')
+    parser2.add_argument('--forecast', action='store_true',
+                        help='')
+    parser2.add_argument('--forecast_all', action='store_true',
+                        help='')
+
 
     n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
 
-    if args1.scaled:
+    if args1.scaled and 'lstm' in args1.architecture:
         parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_layers_{}_{}_sc'.format(args1.architecture
                                                                                  , args1.sequence_length
                                                                                  , args1.embedding_dim
                                                                                  ,args1.n_layers_1
                                                                                  ,args1.n_layers_2),
                              help="ae")
-    else:
+    elif 'lstm' in args1.architecture:
         parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}'.format(args1.architecture, args1.sequence_length, args1.embedding_dim), help="ae")
+
+    else:
+        parser2.add_argument("--model_name", default='{}_sl_{}_fn_{}_ks_{}'.format(args1.architecture, args1.sequence_length,
+                                                                                   args1.filter_num, args1.kernel_size), help="ae")
+
     args2 = parser2.parse_args()
 
     args1.out_window = args1.sequence_length

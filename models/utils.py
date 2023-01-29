@@ -48,7 +48,7 @@ def deconv_block(in_f, out_f, kernel_size = 2, stride = 2, activation=nn.ReLU(),
             return nn.Sequential(
                     nn.ConvTranspose2d(in_f, out_f, kernel_size, stride *args, **kwargs))
 
-def conv_block1D(in_f, out_f, kernel_size =8, padding = 1, activation=nn.ReLU(), batch_norm=True,
+def conv_block1D(in_f, out_f, kernel_size =3, padding = 1, activation=nn.ReLU(), batch_norm=True,
                pool=True, pool_ks=2, pool_stride=2, pool_pad=0, *args, **kwargs):
 
     if batch_norm:

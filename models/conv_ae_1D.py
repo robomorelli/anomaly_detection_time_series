@@ -53,6 +53,12 @@ class Encoder(nn.Module):
 
     def forward(self, x):
         x = self.nn_enc(x)
+
+        #enc1 = self.nn_enc[0](x)
+        #enc2 = self.nn_enc[1](enc1)
+        #enc3 = self.nn_enc[2](enc2)
+        #enc3 = enc3.view(-1, self.flattened_size)
+
         x = x.view(-1, self.flattened_size)
         enc = self.encoder_layer(x)
         return enc
@@ -100,6 +106,10 @@ class Decoder(nn.Module):
         x = x.view((x.shape[0], self.filter_num_list[0], -1))
 
         dec = self.nn_dec(x)
+
+        #dec1 = self.nn_dec[0](x)
+        #dec2 = self.nn_dec[1](dec1)
+        #dec3 = self.nn_dec[2](dec2)
 
         return dec
 
