@@ -13,9 +13,16 @@ from models.conv_ae_1D import *
 from config import *
 import argparse
 from torchvision.transforms import transforms as T, Lambda
+import platform
 
 def main(args1, args2):
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
+
+    if platform.node() == 'leonard':
+        device = 'cpu'
+    else:
+        use_cuda = torch.cuda.is_available()
+        device = torch.device("cuda:0" if use_cuda else "cpu")
 
     if args1.columns_subset:
         args1.columns = args1.columns[:args1.columns_subset]
@@ -221,7 +228,7 @@ if __name__ == '__main__':
 
     parser2 = argparse.ArgumentParser()
     parser2.add_argument("--data_path", type=str, default=f'./data/FIORIRE/dataset_{args1.sampling_rate}/')
-    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
+    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_std_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
     parser2.add_argument('--predict', action='store_true',
                         help='')
     parser2.add_argument('--forecast', action='store_true',
