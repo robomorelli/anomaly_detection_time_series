@@ -56,7 +56,8 @@ def main(args1, args2):
         transform = T.Compose([
             T.ToTensor(),
             Lambda(lambda x: x.permute((0, 2, 1))),
-            Lambda(lambda x: x.squeeze())
+            Lambda(lambda x: x.squeeze(0))
+
         ])
 
     else:
@@ -108,7 +109,7 @@ def main(args1, args2):
     if args1.architecture == "lstm_ae":
         model = LSTM_AE(seq_in=args1.sequence_length, seq_out= args1.out_window, n_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        n_layers_1=args1.n_layers_1, n_layers_2=args1.n_layers_2).to(device)
+                        n_layers_1=args1.n_layers_1, n_layers_2=args1.n_layers_2, no_latent=args1.no_latent).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
@@ -165,50 +166,52 @@ def main(args1, args2):
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
 
     elif args1.architecture == "conv_ae1D":
-        model = CONV_AE1D(in_channel=len(df_train.columns), width=args1.sequence_length,
+        model = CONV_AE1D(in_channel=len(df_train.columns), length=args1.sequence_length,
                         kernel_size=args1.kernel_size, filter_num=args1.filter_num,
                  latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         criterion = nn.MSELoss()
-
         train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
               out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
-
 
 
 
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
+    parser1.add_argument("--architecture", default='conv_ae', help="[lstm, lstm_ae, lstm_vae,"
                                                                 " lstm_vae_vanilla, conv_ae, conv_ae1D,"
                                                                 " conv_vae]")
-    parser1.add_argument("--columns", default=columns, help="columns imported from config")
+    parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
     parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
-    parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
-    parser1.add_argument("--batch_size", default=1000, help="batch size")
-    parser1.add_argument("--epochs", default=200, help="ns")
+    parser1.add_argument("--dataset_subset", default=500000, help="number of row to use from all the dataset")
+    parser1.add_argument("--batch_size", default=500, help="batch size")
+
+    parser1.add_argument("--epochs", default=50, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
     parser1.add_argument("--lr", default=0.0009, help="nus")
-    parser1.add_argument("--embedding_dim", default=8, help="s")
-    parser1.add_argument("--latent_dim", default=20, help="")
-
     parser1.add_argument("--out_window", default=7, help="sequence lenght of the output")
     parser1.add_argument("--sequence_length", default=16, help="sequence_length")
-    parser1.add_argument("--n_layers", default=2, help="") # conv architecture
-    parser1.add_argument("--n_layers_1", default=2, help="")
-    parser1.add_argument("--n_layers_2", default=1, help="")
+
+    # conv architecture
+    parser1.add_argument("--n_layers", default=2, help="")
     parser1.add_argument("--kernel_size", default=3, help="")
-    parser1.add_argument("--filter_num", default=128, help="")
+    parser1.add_argument("--filter_num", default=32, help="")
     parser1.add_argument("--activation", default=nn.ReLU(), help="")
+
+    # lstm architecture
+    parser1.add_argument("--embedding_dim", default=32, help="s")
+    parser1.add_argument("--n_layers_1", default=2, help="")
+    parser1.add_argument("--n_layers_2", default=2, help="")
+    parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
+    parser1.add_argument("--latent_dim", default=50, help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
     parser1.add_argument("--target", default=None, help="columns name of the target if none >>> autoencoder mode")
-
     parser1.add_argument("--sampling_rate", type=str, default="4s", help="[2s, 4s]")
     parser1.add_argument('--scaled', action='store_const', const=False, default=True,
                         help='')

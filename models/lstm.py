@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch
 from tqdm import tqdm
-from utils import EarlyStopping
+from models.utils import EarlyStopping
 torch.manual_seed(0)
 
 ####################
@@ -40,6 +40,8 @@ class Encoder(nn.Module):
 
         self.out = nn.Linear(embedding_size, self.output_size)
         self.apply(self.weight_init)
+
+        print(self)
     @staticmethod
     def weight_init(m):
         if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):

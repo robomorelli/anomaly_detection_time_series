@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 class Encoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10,
-                  img_width=16):
+                  length=16):
         super(Encoder, self).__init__()
 
         self.nn_enc = nn.Sequential()
@@ -18,7 +18,7 @@ class Encoder(nn.Module):
         self.kernel_size = kernel_size
         self.filter_num_list = filter_num_list
         self.latent_dim = latent_dim
-        self.w = img_width
+        self.l = length
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
@@ -28,7 +28,7 @@ class Encoder(nn.Module):
             self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block1D(num, self.filter_num_list[i+1],
                                                                   self.kernel_size))
 
-        self.flattened_size, self.w_enc = self._get_final_flattened_size()
+        self.flattened_size, self.l_enc = self._get_final_flattened_size()
         self.encoder_layer = nn.Linear(self.flattened_size, self.latent_dim)
 
         self.init_kaiming_normal()
@@ -45,7 +45,7 @@ class Encoder(nn.Module):
     def _get_final_flattened_size(self):
         with torch.no_grad():
             x = torch.zeros(
-                (1, self.in_channel, self.w)
+                (1, self.in_channel, self.l)
             )
             x = self.nn_enc(x)
             _, c, w = x.size()
@@ -54,11 +54,6 @@ class Encoder(nn.Module):
     def forward(self, x):
         x = self.nn_enc(x)
 
-        #enc1 = self.nn_enc[0](x)
-        #enc2 = self.nn_enc[1](enc1)
-        #enc3 = self.nn_enc[2](enc2)
-        #enc3 = enc3.view(-1, self.flattened_size)
-
         x = x.view(-1, self.flattened_size)
         enc = self.encoder_layer(x)
         return enc
@@ -66,7 +61,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10, flattened_size=None,
-                 img_heigth=16, img_width=16, w_enc=2):
+                 length=16):
         super(Decoder, self).__init__()
 
         self.nn_dec = nn.Sequential()
@@ -78,7 +73,7 @@ class Decoder(nn.Module):
         self.filter_num_list = filter_num_list
         self.latent_dim = latent_dim
         self.flattened_size = flattened_size
-        #self.w_enc = w_enc deprecated
+        self.length = length
         self.filter_num_list = self.filter_num_list[::-1]
 
         self.reshape = nn.Linear(self.latent_dim, self.flattened_size)
@@ -115,7 +110,7 @@ class Decoder(nn.Module):
 
 # define the NN architecture
 class CONV_AE1D(nn.Module):
-    def __init__(self, in_channel=16, width=16, kernel_size=3, filter_num=2,
+    def __init__(self, in_channel=16,  length=16, kernel_size=3, filter_num=2,
                  latent_dim=50, n_layers=1, activation = nn.ReLU()):
         super(CONV_AE1D, self).__init__()
 
@@ -125,17 +120,19 @@ class CONV_AE1D(nn.Module):
         self.n_layers = n_layers
         self.latent_dim = latent_dim
         self.act = activation
-        self.w = width  # sequence length (to transpose respect to the df format)
+        self.l = length  # sequence length (to transpose respect to the df format)
 
-        self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
+        self.filter_num_list = [int(self.filter_num * ((ix + 1)*2)) for ix in range(self.n_layers)]
+        #self.kernel_size_list = [int(self.kernel_size / ((ix + 1) * 2)) for ix in range(self.n_layers)]
         self.filter_num_list = [self.in_channel] + [self.filter_num] + self.filter_num_list
+        #self.kernel_size_list = [self.l] + self.kernel_size_list
 
         self.encoder = Encoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
-                               latent_dim=self.latent_dim, img_width=self.w)
+                               latent_dim=self.latent_dim, length=self.l, activation=self.act)
         self.flattened_size = self.encoder.flattened_size
         self.decoder = Decoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
                                latent_dim=self.latent_dim, flattened_size=self.flattened_size,
-                               img_width=self.w, w_enc=self.encoder.w_enc)
+                               length=self.encoder.l_enc, activation=self.act)
 
         print(self)
     def forward(self, x):
