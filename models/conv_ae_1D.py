@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 class Encoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10,
-                  length=16):
+                  length=16, activation=nn.ReLU(), stride=1, pool=True, bn=True):
         super(Encoder, self).__init__()
 
         self.nn_enc = nn.Sequential()
@@ -19,17 +19,23 @@ class Encoder(nn.Module):
         self.filter_num_list = filter_num_list
         self.latent_dim = latent_dim
         self.l = length
+        self.act = activation
+        self.stride = stride
+        self.pool = pool
+        self.bn = bn
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
                 self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block1D(num, self.filter_num_list[i + 1],
-                                                                          self.kernel_size))
+                                                                          self.kernel_size, activation=self.act, stride=self.stride,
+                                                                            pool=self.pool,  batch_norm=self.bn))
                 break
             self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block1D(num, self.filter_num_list[i+1],
-                                                                  self.kernel_size))
+                                                                  self.kernel_size, activation=self.act, stride=self.stride,
+                                                                        pool=self.pool, batch_norm=self.bn))
 
         self.flattened_size, self.l_enc = self._get_final_flattened_size()
-        self.encoder_layer = nn.Linear(self.flattened_size, self.latent_dim)
+        #self.encoder_layer = nn.Linear(self.flattened_size, self.latent_dim)
 
         self.init_kaiming_normal()
 
@@ -52,16 +58,15 @@ class Encoder(nn.Module):
         return c * w, w
 
     def forward(self, x):
-        x = self.nn_enc(x)
-
-        x = x.view(-1, self.flattened_size)
-        enc = self.encoder_layer(x)
+        enc = self.nn_enc(x)
+        #enc = enc.view(-1, self.flattened_size)
+        #enc = self.encoder_layer(enc)
         return enc
 
 
 class Decoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10, flattened_size=None,
-                 length=16):
+                 length=16, activation=nn.ReLU(), bn=True):
         super(Decoder, self).__init__()
 
         self.nn_dec = nn.Sequential()
@@ -75,16 +80,18 @@ class Decoder(nn.Module):
         self.flattened_size = flattened_size
         self.length = length
         self.filter_num_list = self.filter_num_list[::-1]
+        self.act = activation
+        self.bn = bn
 
         self.reshape = nn.Linear(self.latent_dim, self.flattened_size)
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
-                self.nn_dec.add_module('dec_lay_{}'.format(i), deconv_block1D(num, self.filter_num_list[i+1]))
+                self.nn_dec.add_module('dec_lay_{}'.format(i), deconv_block1D(num, self.filter_num_list[i+1], activation=self.act, batch_norm = self.bn))
                 break
-            self.nn_dec.add_module('dec_lay_{}'.format(i), deconv_block1D(num, self.filter_num_list[i + 1]))
+            self.nn_dec.add_module('dec_lay_{}'.format(i), deconv_block1D(num, self.filter_num_list[i + 1], activation=self.act, batch_norm = self.bn))
 
-        self.decoder_layer = nn.Conv1d(self.filter_num_list[i+1], self.in_channel, kernel_size=1)
+        #self.decoder_layer = nn.Conv1d(self.filter_num_list[i+1], self.in_channel, kernel_size=1)
         self.init_kaiming_normal()
 
     def init_kaiming_normal(self, mode='fan_in'):
@@ -97,9 +104,8 @@ class Decoder(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        x = self.reshape(x)
-        x = x.view((x.shape[0], self.filter_num_list[0], -1))
-
+        #x = self.reshape(x)
+        #x = x.view((x.shape[0], self.filter_num_list[0], -1))
         dec = self.nn_dec(x)
 
         #dec1 = self.nn_dec[0](x)
@@ -111,7 +117,7 @@ class Decoder(nn.Module):
 # define the NN architecture
 class CONV_AE1D(nn.Module):
     def __init__(self, in_channel=16,  length=16, kernel_size=3, filter_num=2,
-                 latent_dim=50, n_layers=1, activation = nn.ReLU()):
+                 latent_dim=50, n_layers=1, activation = nn.ReLU(), stride=1, pool=True, bn=True):
         super(CONV_AE1D, self).__init__()
 
         self.in_channel = in_channel
@@ -121,18 +127,21 @@ class CONV_AE1D(nn.Module):
         self.latent_dim = latent_dim
         self.act = activation
         self.l = length  # sequence length (to transpose respect to the df format)
+        self.stride = stride
+        self.pool = pool
+        self.bn = bn
 
-        self.filter_num_list = [int(self.filter_num * ((ix + 1)*2)) for ix in range(self.n_layers)]
-        #self.kernel_size_list = [int(self.kernel_size / ((ix + 1) * 2)) for ix in range(self.n_layers)]
+        self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
         self.filter_num_list = [self.in_channel] + [self.filter_num] + self.filter_num_list
-        #self.kernel_size_list = [self.l] + self.kernel_size_list
 
         self.encoder = Encoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
-                               latent_dim=self.latent_dim, length=self.l, activation=self.act)
+                               latent_dim=self.latent_dim, length=self.l, activation=self.act, stride=self.stride, pool=self.pool,
+                               bn=self.bn )
         self.flattened_size = self.encoder.flattened_size
         self.decoder = Decoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
                                latent_dim=self.latent_dim, flattened_size=self.flattened_size,
-                               length=self.encoder.l_enc, activation=self.act)
+                               length=self.encoder.l_enc, activation=self.act,
+                               bn=self.bn)
 
         print(self)
     def forward(self, x):
@@ -159,6 +168,7 @@ def train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimiz
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
+        print('epoch', epoch)
         train_loss = 0.0
         train_steps = 0
         for i, batch in tqdm(enumerate(train_iter), total=len(train_iter), unit="batch"):
