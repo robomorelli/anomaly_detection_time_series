@@ -217,10 +217,10 @@ if __name__ == '__main__':
 
     # conv architecture
     parser1.add_argument("--n_layers", default=1, help="")
-    parser1.add_argument("--pool", default=0, help="0 or 1")
-    parser1.add_argument("--bn", default=0, help="0 or 1")
-    parser1.add_argument("--stride", default=2, help="")
-    parser1.add_argument("--kernel_size", default=3, help="")
+    parser1.add_argument("--pool", default=1, help="0 or 1")
+    parser1.add_argument("--bn", default=1, help="0 or 1")
+    parser1.add_argument("--stride", default=1, help="")
+    parser1.add_argument("--kernel_size", default=7, help="")
     parser1.add_argument("--filter_num", default=64, help="")
     parser1.add_argument("--activation", default=nn.ELU(), help="")
 
@@ -249,7 +249,6 @@ if __name__ == '__main__':
                         help='')
     parser2.add_argument('--forecast_all', action='store_true',
                         help='')
-
 
     n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
 

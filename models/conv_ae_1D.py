@@ -2,11 +2,12 @@ import os
 import torch.nn as nn
 from models.utils import conv_block1D, deconv_block1D
 import torch
+import numpy as np
 from tqdm import tqdm
 
 class Encoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10,
-                  length=16, activation=nn.ReLU(), stride=1, pool=True, bn=True):
+                  length=16, activation=nn.ReLU(), stride=1, pool=True, bn=True, dilation=1):
         super(Encoder, self).__init__()
 
         self.nn_enc = nn.Sequential()
@@ -23,16 +24,18 @@ class Encoder(nn.Module):
         self.stride = stride
         self.pool = pool
         self.bn = bn
+        self.dilation = dilation
+        self.padding = int((dilation * (self.kernel_size - 1) / 2))
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
                 self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block1D(num, self.filter_num_list[i + 1],
                                                                           self.kernel_size, activation=self.act, stride=self.stride,
-                                                                            pool=self.pool,  batch_norm=self.bn))
+                                                                            pool=self.pool,  batch_norm=self.bn, padding=self.padding))
                 break
             self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block1D(num, self.filter_num_list[i+1],
                                                                   self.kernel_size, activation=self.act, stride=self.stride,
-                                                                        pool=self.pool, batch_norm=self.bn))
+                                                                        pool=self.pool, batch_norm=self.bn, padding=self.padding))
 
         self.flattened_size, self.l_enc = self._get_final_flattened_size()
         #self.encoder_layer = nn.Linear(self.flattened_size, self.latent_dim)
@@ -83,7 +86,7 @@ class Decoder(nn.Module):
         self.act = activation
         self.bn = bn
 
-        self.reshape = nn.Linear(self.latent_dim, self.flattened_size)
+        #self.reshape = nn.Linear(self.latent_dim, self.flattened_size)
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
@@ -91,7 +94,7 @@ class Decoder(nn.Module):
                 break
             self.nn_dec.add_module('dec_lay_{}'.format(i), deconv_block1D(num, self.filter_num_list[i + 1], activation=self.act, batch_norm = self.bn))
 
-        #self.decoder_layer = nn.Conv1d(self.filter_num_list[i+1], self.in_channel, kernel_size=1)
+        self.decoder_layer = nn.Conv1d(self.filter_num_list[i+1], self.in_channel, kernel_size=1)
         self.init_kaiming_normal()
 
     def init_kaiming_normal(self, mode='fan_in'):
@@ -107,6 +110,7 @@ class Decoder(nn.Module):
         #x = self.reshape(x)
         #x = x.view((x.shape[0], self.filter_num_list[0], -1))
         dec = self.nn_dec(x)
+        dec = self.decoder_layer(dec)
 
         #dec1 = self.nn_dec[0](x)
         #dec2 = self.nn_dec[1](dec1)
@@ -131,12 +135,15 @@ class CONV_AE1D(nn.Module):
         self.pool = pool
         self.bn = bn
 
+        if not self.pool:
+            self.stride = 2
+
         self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
         self.filter_num_list = [self.in_channel] + [self.filter_num] + self.filter_num_list
 
         self.encoder = Encoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
                                latent_dim=self.latent_dim, length=self.l, activation=self.act, stride=self.stride, pool=self.pool,
-                               bn=self.bn )
+                               bn=self.bn)
         self.flattened_size = self.encoder.flattened_size
         self.decoder = Decoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
                                latent_dim=self.latent_dim, flattened_size=self.flattened_size,
