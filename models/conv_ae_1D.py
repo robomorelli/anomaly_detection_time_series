@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 class Encoder(nn.Module):
-    def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10,
+    def __init__(self, in_channel=1, kernel_size=3, padding=1, filter_num_list=None, latent_dim=10,
                   length=16, activation=nn.ReLU(), stride=1, pool=True, bn=True, dilation=1):
         super(Encoder, self).__init__()
 
@@ -25,7 +25,7 @@ class Encoder(nn.Module):
         self.pool = pool
         self.bn = bn
         self.dilation = dilation
-        self.padding = int((dilation * (self.kernel_size - 1) / 2))
+        self.padding=padding
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
@@ -121,7 +121,9 @@ class Decoder(nn.Module):
 # define the NN architecture
 class CONV_AE1D(nn.Module):
     def __init__(self, in_channel=16,  length=16, kernel_size=3, filter_num=2,
-                 latent_dim=50, n_layers=1, activation = nn.ReLU(), stride=1, pool=True, bn=True):
+                 latent_dim=50, n_layers=1, activation = nn.ReLU(), stride=1, dilation=1,
+                 pool=True, bn=True,
+                 increasing=False):
         super(CONV_AE1D, self).__init__()
 
         self.in_channel = in_channel
@@ -134,14 +136,22 @@ class CONV_AE1D(nn.Module):
         self.stride = stride
         self.pool = pool
         self.bn = bn
+        self.increasing = increasing
+        self.dilation=dilation
+
+        self.padding = int((self.dilation * (self.kernel_size - 1) / 2))
 
         if not self.pool:
             self.stride = 2
 
-        self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
+        if self.increasing:
+            self.filter_num_list = [int(self.filter_num * ((ix + 1) * 2)) for ix in range(self.n_layers)]
+        else:
+            self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
+
         self.filter_num_list = [self.in_channel] + [self.filter_num] + self.filter_num_list
 
-        self.encoder = Encoder(self.in_channel, kernel_size=self.kernel_size, filter_num_list=self.filter_num_list,
+        self.encoder = Encoder(self.in_channel, kernel_size=self.kernel_size, padding=self.padding, filter_num_list=self.filter_num_list,
                                latent_dim=self.latent_dim, length=self.l, activation=self.act, stride=self.stride, pool=self.pool,
                                bn=self.bn)
         self.flattened_size = self.encoder.flattened_size

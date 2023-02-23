@@ -15,6 +15,7 @@ from config import *
 import argparse
 from torchvision.transforms import transforms as T, Lambda
 import platform
+from datetime import datetime
 
 def main(args1, args2):
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
@@ -152,7 +153,6 @@ def main(args1, args2):
         model = LSTM_VAEV(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
                          n_layers=args1.n_layers).to(device)
-        #criterion = nn.MSELoss()
         criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
@@ -164,7 +164,8 @@ def main(args1, args2):
     elif args1.architecture == "conv_ae":
         model = CONV_AE(in_channel=1,  heigth=args1.sequence_length, width=len(args1.columns),
                         kernel_size=args1.kernel_size, filter_num=args1.filter_num,
-                 latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation).to(device)
+                 latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation,
+                        increasing=args1.increasing, flattened=args1.flattened).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         criterion = nn.MSELoss()
@@ -175,7 +176,8 @@ def main(args1, args2):
     elif args1.architecture == "conv_ae1D":
         model = CONV_AE1D(in_channel=len(df_train.columns), length=args1.sequence_length,
                           kernel_size=args1.kernel_size, filter_num=args1.filter_num, stride=args1.stride,pool=args1.pool,
-                          latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation=args1.activation, bn=args1.bn).to(device)
+                          latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation=args1.activation, bn=args1.bn
+                          ,increasing=args1.increasing).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         criterion = nn.MSELoss()
@@ -183,24 +185,13 @@ def main(args1, args2):
                         out_dir=checkpoint_path, model_name=args2.model_name, epochs=args1.epochs)
 
 
-    elif args1.architecture == "conv_ae1Dgpt":
-        model = CONV_AE1DGPT(in_channel=len(df_train.columns),kernel_size=args1.kernel_size, filter_num=args1.filter_num
-                          , activation = args1.activation).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-        criterion = nn.MSELoss()
-        train_conv_ae1Dgpt(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
-              out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
-
-
-
 
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
     parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
-                                                                " lstm_vae_vanilla, conv_ae, conv_ae1D, conv_ae1Dgpt,"
-                                                                " conv_vae]")
+                                                                " lstm_vae_vanilla, conv_ae, conv_ae1D")
+    #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
@@ -212,17 +203,21 @@ if __name__ == '__main__':
     parser1.add_argument("--epochs", default=50, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
     parser1.add_argument("--lr", default=0.0009, help="nus")
-    parser1.add_argument("--out_window", default=7, help="sequence lenght of the output")
-    parser1.add_argument("--sequence_length", default=16, help="sequence_length")
+    parser1.add_argument("--out_window", default=5, help="sequence lenght of the output")
+    parser1.add_argument("--sequence_length", default=40, help="sequence_length")
 
-    # conv architecture
-    parser1.add_argument("--n_layers", default=1, help="")
-    parser1.add_argument("--pool", default=1, help="0 or 1")
-    parser1.add_argument("--bn", default=1, help="0 or 1")
+    # conv architecture (1D and 2D)
+    parser1.add_argument("--n_layers", default=2, help="")
+    parser1.add_argument("--increasing", default=0, help="0 or 1")
     parser1.add_argument("--stride", default=1, help="")
     parser1.add_argument("--kernel_size", default=7, help="")
     parser1.add_argument("--filter_num", default=64, help="")
     parser1.add_argument("--activation", default=nn.ELU(), help="")
+    # conv architecture (1D only)
+    parser1.add_argument("--pool", default=1, help="0 or 1")
+    parser1.add_argument("--bn", default=1, help="0 or 1")
+    # conv architecture (2D only)
+    parser1.add_argument("--flattened", default=1, help="0 or 1")
 
     # lstm architecture
     parser1.add_argument("--embedding_dim", default=32, help="s")
@@ -252,19 +247,20 @@ if __name__ == '__main__':
 
     n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
 
-    if args1.scaled and 'lstm' in args1.architecture:
-        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_layers_{}_{}_sc'.format(args1.architecture
-                                                                                 , args1.sequence_length
-                                                                                 , args1.embedding_dim
-                                                                                 ,args1.n_layers_1
-                                                                                 ,args1.n_layers_2),
-                             help="ae")
-    elif 'lstm' in args1.architecture:
-        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}'.format(args1.architecture, args1.sequence_length, args1.embedding_dim), help="ae")
+    now = datetime.now()
+    print("now =", now)
+    # dd/mm/YY H:M:S
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    dt_string = dt_string.replace('/', '_').replace(' ', '_')
 
+    if 'lstm' in args1.architecture:
+        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_layers_{}_{}_{}'.format(args1.architecture,
+                                                                                           args1.sequence_length,
+                                                                                           args1.embedding_dim, args1.n_layers_1
+                                                                                           ,args1.n_layers_2, dt_string), help="ae")
     else:
-        parser2.add_argument("--model_name", default='{}_sl_{}_fn_{}_ks_{}'.format(args1.architecture, args1.sequence_length,
-                                                                                   args1.filter_num, args1.kernel_size), help="ae")
+        parser2.add_argument("--model_name", default='{}_sl_{}_filter_n_{}_kernel_size_{}_{}'.format(args1.architecture, args1.sequence_length,
+                                                                                   args1.filter_num, args1.kernel_size, dt_string), help="ae")
 
     args2 = parser2.parse_args()
 
