@@ -177,7 +177,7 @@ def main(args1, args2):
         model = CONV_AE1D(in_channel=len(df_train.columns), length=args1.sequence_length,
                           kernel_size=args1.kernel_size, filter_num=args1.filter_num, stride=args1.stride,pool=args1.pool,
                           latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation=args1.activation, bn=args1.bn
-                          ,increasing=args1.increasing).to(device)
+                          ,increasing=args1.increasing, flattened=args1.flattened).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         criterion = nn.MSELoss()
@@ -207,24 +207,25 @@ if __name__ == '__main__':
     parser1.add_argument("--sequence_length", default=40, help="sequence_length")
 
     # conv architecture (1D and 2D)
-    parser1.add_argument("--n_layers", default=2, help="")
+    parser1.add_argument("--n_layers", default=1, help="")
     parser1.add_argument("--increasing", default=0, help="0 or 1")
     parser1.add_argument("--stride", default=1, help="")
     parser1.add_argument("--kernel_size", default=7, help="")
-    parser1.add_argument("--filter_num", default=64, help="")
+    parser1.add_argument("--filter_num", default=110, help="")
     parser1.add_argument("--activation", default=nn.ELU(), help="")
+    parser1.add_argument("--flattened", default=1, help="0 or 1")
     # conv architecture (1D only)
     parser1.add_argument("--pool", default=1, help="0 or 1")
     parser1.add_argument("--bn", default=1, help="0 or 1")
     # conv architecture (2D only)
-    parser1.add_argument("--flattened", default=1, help="0 or 1")
+
 
     # lstm architecture
     parser1.add_argument("--embedding_dim", default=32, help="s")
     parser1.add_argument("--n_layers_1", default=2, help="")
     parser1.add_argument("--n_layers_2", default=2, help="")
     parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
-    parser1.add_argument("--latent_dim", default=50, help="")
+    parser1.add_argument("--latent_dim", default=100, help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
     parser1.add_argument("--target", default=None, help="columns name of the target if none >>> autoencoder mode")

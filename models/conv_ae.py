@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 class Encoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10,
-                 img_heigth=16, img_width=16, activation=nn.ReLU(), flattened=True):
+                 img_heigth=16, img_width=16, activation=nn.ReLU(), flattened=True, padding=1):
         super(Encoder, self).__init__()
 
         self.nn_enc = nn.Sequential()
@@ -22,14 +22,17 @@ class Encoder(nn.Module):
         self.w = img_width
         self.act = activation
         self.flattened = flattened
+        self.padding = padding
 
         for i, num in enumerate(self.filter_num_list):
             if i + 2 == len(self.filter_num_list):
                 self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block(num, self.filter_num_list[i + 1],
-                                                                          self.kernel_size,  activation=self.act))
+                                                                          self.kernel_size,  activation=self.act,
+                                                                          padding=self.padding))
                 break
             self.nn_enc.add_module('enc_lay_{}'.format(i), conv_block(num, self.filter_num_list[i+1],
-                                                                  self.kernel_size, activation=self.act))
+                                                                  self.kernel_size, activation=self.act,
+                                                                      padding=self.padding))
 
         self.flattened_size, self.h_enc, self.w_enc = self._get_final_flattened_size()
 
