@@ -8,7 +8,7 @@ from models.lstm_ae import *
 from models.lstm import *
 from models.lstm_vae import *
 from models.lstm_vae_vanilla import *
-from models.conv_ae import *
+from models.conv_ae import 
 from models.conv_ae_1D import *
 from models.conv_ae_1D_gpt import *
 from config import *
@@ -20,12 +20,12 @@ from datetime import datetime
 def main(args1, args2):
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
 
-    if platform.node() == 'leonard':
-        device = 'cpu'
-    else:
-        use_cuda = torch.cuda.is_available()
-        device = torch.device("cuda:0" if use_cuda else "cpu")
+    sm = str(torch.cuda.get_device_capability())
+    sm = ''.join((sm.strip('()').split(',')[0],sm.strip('()').split(',')[1])).replace(' ', '')
 
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if use_cuda and sm in torch.cuda.get_arch_list() else "cpu")
+    
     if args1.columns_subset:
         args1.columns = args1.columns[:args1.columns_subset]
     dataRaw = xdf[args1.columns].dropna()
@@ -53,9 +53,6 @@ def main(args1, args2):
 
     df_train = pd.DataFrame(X_train, columns=dfNorm.columns)
     df_test = pd.DataFrame(X_test, columns=dfNorm.columns)
-
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
 
     if args1.architecture == "conv_ae":
         transform = T.Compose([

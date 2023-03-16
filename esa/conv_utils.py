@@ -14,7 +14,7 @@ from config import *
 def moving_average(x, w):
     return np.convolve(x, np.ones(w), 'same') / w
 
-def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=None):
+def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=None, arch='conv_ae2D'):
     
     if shift==None:
         shift = np.random.randint(len(test_iter.dataset.df_data)-100)
@@ -25,9 +25,13 @@ def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=No
 
         x[i,:,:] = test_iter.dataset.df_data.iloc[shift + i*sequence_length:shift + (i+1)*sequence_length,:]\
         .values
-
+    
     x = torch.from_numpy(x).float()
-    x = torch.unsqueeze(x, 1)
+    if arch=='conv_ae2D':
+        x = torch.unsqueeze(x, 1)
+    elif arch=='conv_ae1D':
+        x = torch.squeeze(x, 1)
+        x = x.permute((0, 2, 1)) 
     
     return x, shift
 
@@ -77,33 +81,50 @@ def read_dataset_conv(dataset_name, scaled,columns_subset, dataset_subset, cols,
 
     return df_train, df_test, train_iter, test_iter
 
+
+
 def show_results(x, yo, cols, model_name, params_conf, par_nums, shift, 
-                 num_batch, architecture='conv_ae', save=False):
+                 num_batch, arch='conv_ae2D', save=False):
     
-    path = './figure_results/evaluation/{}/{}/shift_{}/'.format(architecture, model_name, shift, num_batch)
-    for i in range(x.shape[2]):
-        fig, ax = plt.subplots(1,1, figsize=(8,4))
+    path = './figure_results/evaluation/{}/{}/shift_{}/'.format(arch, model_name, shift, num_batch)
+    
+    if arch=='conv_ae':
+        for i in range(x.shape[2]):
+            fig, ax = plt.subplots(1,1, figsize=(8,4))
 
-        ax.plot(yo.flatten(0,1)[:,i].to("cpu").detach().numpy(), 
-                   linestyle='--', label='reconstr', color='black')
-        ax.plot(x.flatten(0,1)[:,i].to("cpu").detach().numpy(), label ='original')
-        x_i = x.flatten(0,1)[:,i]
-        y_o = yo.flatten(0,1)[:,i]
+            ax.plot(yo.flatten(0,1)[:,i].to("cpu").detach().numpy(), 
+                       linestyle='--', label='reconstr', color='black')
+            ax.plot(x.flatten(0,1)[:,i].to("cpu").detach().numpy(), label ='original')
+            x_i = x.flatten(0,1)[:,i]
+            y_o = yo.flatten(0,1)[:,i]
 
-        loss_u = torch.nn.L1Loss(reduction='none')(y_o, x_i)
-        loss_u = moving_average(loss_u.to("cpu").detach().numpy(), params_conf['sequence_length'])
+            #loss_u = torch.nn.L1Loss(reduction='none')(y_o, x_i)
+            #loss_u = moving_average(loss_u.to("cpu").detach().numpy(), params_conf['sequence_length'])
+            #ax.plot(loss_u, label ='mean abs err')
 
-        ax.plot(loss_u, label ='mean abs err')
-        ax.set_xlabel('time steps')
-        ax.set_ylabel('{}'.format(cols[i]))
-        ax.set_title('Input Vs Recon. Par num {} s_l {}'\
-                        .format(par_nums, 
-                                params_conf['sequence_length'], 
-                                #params_conf['latent_dim'], 
-                                #params_conf['n_layers'],
-                                #params_conf['filter_num'],
-                                ))
-        ax.legend()
-        if save:
-            os.makedirs(path, exist_ok=True)
-            plt.savefig(path + '{}_shift_{}_batch_{}.png'.format(cols[i], num_batch))
+            ax.set_xlabel('time steps')
+            ax.set_ylabel('{}'.format(cols[i]))
+            ax.set_title('Input Vs Recon. Par num {} s_l {}'\
+                            .format(par_nums, 
+                                    params_conf['sequence_length'], 
+                                    ))
+            ax.legend()
+            if save:
+                os.makedirs(path, exist_ok=True)
+                plt.savefig(path + '{}_shift_{}_batch_{}.png'.format(cols[i], num_batch))
+
+    elif arch=='conv_ae1D':
+        for i in range(x.shape[1]):
+            fig, ax = plt.subplots(1,1, figsize=(8,4))
+            ax.plot(yo[:,i,:].flatten().to("cpu").detach().numpy(), 
+                       linestyle='--', label='reconstr', color='black')
+            ax.plot(x[:,i,:].flatten().to("cpu").detach().numpy(), label ='original')
+            ax.set_xlabel('time steps')
+            ax.set_ylabel('{}'.format(cols[i]))
+            ax.set_title('Input Vs Recon. Par num {} s_l {}'\
+                            .format(par_nums, params_conf['sequence_length']))
+
+            ax.legend()
+            if save:
+                os.makedirs(path, exist_ok=True)
+                plt.savefig(path + '{}_shift_{}_batch_{}.png'.format(cols[i], num_batch))
