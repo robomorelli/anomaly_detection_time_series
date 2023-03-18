@@ -143,21 +143,19 @@ def main(args1, args2):
     elif args1.architecture == "lstm_vae":
         model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers_1=args1.n_layers_1,
-                         n_layers_2=args1.n_layers_2, kld=args1.kld).to(device)
+                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
         criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
         train_lstm_vae(param_conf, n_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
                   device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
-                       Nf_lognorm=None, Nf_binomial=None, kld_factor = 1, kld=args1.kld)
+                       Nf_lognorm=None, Nf_binomial=None, kld_factor = 1)
 
     elif args1.architecture == "lstm_vae_vanilla":
         model = LSTM_VAEV(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
                          n_layers=args1.n_layers).to(device)
-        criterion = nn.MSELoss()
-        #criterion = None
+        criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
 
@@ -193,7 +191,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm, lstm_ae, lstm_vae,"
+    parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
                                                                 " lstm_vae_vanilla, conv_ae, conv_ae1D")
     #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
@@ -201,7 +199,7 @@ if __name__ == '__main__':
     parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
     parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
-    parser1.add_argument("--dataset_subset", default=10000, help="number of row to use from all the dataset")
+    parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
     parser1.add_argument("--batch_size", default=500, help="batch size")
 
     parser1.add_argument("--epochs", default=50, help="ns")
@@ -221,6 +219,8 @@ if __name__ == '__main__':
     # conv architecture (1D only)
     parser1.add_argument("--pool", default=1, help="0 or 1")
     parser1.add_argument("--bn", default=1, help="0 or 1")
+    # conv architecture (2D only)
+
 
     # lstm architecture
     parser1.add_argument("--embedding_dim", default=32, help="s")
