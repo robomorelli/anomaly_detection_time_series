@@ -180,8 +180,8 @@ class LSTM_VAEV(nn.Module):
         self.latent_dim = latent_dim
 
         self.encoder = Encoder_vaev(self.seq_in, self.no_features, self.embedding_dim, self.latent_dim, self.n_layers)
-        #self.decoder = Decoder_vaev(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
-        self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
+        self.decoder = Decoder_vaev(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
+        #self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
 
         self.apply(self.weight_init)
 
@@ -264,12 +264,12 @@ def train_lstm_vae_vanilla(param_conf, no_features, train_iter, test_iter, model
             model.train()
             optimizer.zero_grad()
 
-            #x, mu, log_var, y = model(batch[0].to(device))
-            #recon_loss = criterion(y.to(device), x.to(device))
+            x, mu, log_var, y = model(batch[0].to(device))
+            recon_loss = criterion(y.to(device), x.to(device))
 
-            x, mu, log_var, pars = model(batch[0].to(device))
-            recon_loss = loss_function(x, pars, Nf_lognorm,
-                                       Nf_binomial).mean()
+            #x, mu, log_var, pars = model(batch[0].to(device))
+            #recon_loss = loss_function(x, pars, Nf_lognorm,
+            #                           Nf_binomial).mean()
 
             KLD = KL_loss(mu, log_var)
 
@@ -282,9 +282,9 @@ def train_lstm_vae_vanilla(param_conf, no_features, train_iter, test_iter, model
             # if (i + 1) % config['gradient_accumulation_steps'] == 0:
             optimizer.step()
 
-            if i % 100 == 0:
+            if i % 10 == 0:
                 print("Loss:")
-                print("kld {} recton loss {}".format(KLD.mean(), recon_loss))
+                print("kld {} recon loss {}".format(KLD.mean(), recon_loss))
                 print(loss.item())
 
         model.eval()
@@ -293,15 +293,11 @@ def train_lstm_vae_vanilla(param_conf, no_features, train_iter, test_iter, model
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
 
-                #x, mu, log_var, y = model(batch[0].to(device))
-
-                #recon_loss = criterion(y.to(device), x.to(device))
 
                 x, mu, log_var, pars = model(batch[0].to(device))
                 recon_loss = loss_function(x, pars, Nf_lognorm,
                                            Nf_binomial).mean()
                 KLD = KL_loss(mu, log_var)
-
 
                 loss = recon_loss + kld_factor * KLD  # the sum of KL is added to the mean of MSE
 
