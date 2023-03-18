@@ -143,7 +143,8 @@ def main(args1, args2):
     elif args1.architecture == "lstm_vae":
         model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
+                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers_1=args1.n_layers_1,
+                        n_layers_2=args1.n_layers_2, kld=args1.kld, batch_size=args1.batch_size).to(device)
         criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
@@ -191,7 +192,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
+    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm, lstm_ae, lstm_vae,"
                                                                 " lstm_vae_vanilla, conv_ae, conv_ae1D")
     #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
@@ -202,7 +203,7 @@ if __name__ == '__main__':
     parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
     parser1.add_argument("--batch_size", default=500, help="batch size")
 
-    parser1.add_argument("--epochs", default=50, help="ns")
+    parser1.add_argument("--epochs", default=5000, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
     parser1.add_argument("--lr", default=0.0009, help="nus")
     parser1.add_argument("--out_window", default=5, help="sequence lenght of the output")
@@ -223,13 +224,12 @@ if __name__ == '__main__':
 
 
     # lstm architecture
-    parser1.add_argument("--embedding_dim", default=32, help="s")
-    parser1.add_argument("--n_layers_1", default=2, help="")
-    parser1.add_argument("--n_layers_2", default=2, help="")
-    #parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
-    parser1.add_argument("--latent_dim", default=100, help="")
+    parser1.add_argument("--embedding_dim", default=128, help="s")
+    parser1.add_argument("--n_layers_1", default=1, help="")
+    parser1.add_argument("--n_layers_2", default=1, help="")
+    parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
+    parser1.add_argument("--latent_dim", default=400, help="")
 
-    # lstm vae architecture only
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
     parser1.add_argument("--kld", default='vanilla', help="[vanilla, custom]")
 
@@ -243,13 +243,15 @@ if __name__ == '__main__':
     parser1.add_argument("--target", default=None, help="columns name of the target if none >>> autoencoder mode")
     args1 = parser1.parse_args()
 
-
     parser2 = argparse.ArgumentParser()
     parser2.add_argument("--data_path", type=str, default=f'./data/FIORIRE/dataset_{args1.sampling_rate}/')
-    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_std_{args1.sampling_rate}.pkl', help="ae")
-    parser2.add_argument('--predict', action='store_true', help='')
-    parser2.add_argument('--forecast', action='store_true', help='')
-    parser2.add_argument('--forecast_all', action='store_true', help='')
+    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_std_{args1.sampling_rate}.pkl', help="ae") #all_2016-2018_clean_std_{args1.sampling_rate}.pkl
+    parser2.add_argument('--predict', action='store_true',
+                        help='')
+    parser2.add_argument('--forecast', action='store_true',
+                        help='')
+    parser2.add_argument('--forecast_all', action='store_true',
+                        help='')
 
     n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
 

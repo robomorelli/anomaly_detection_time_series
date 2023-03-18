@@ -85,13 +85,13 @@ class Decoder(nn.Module):
             self.LSTMdec = nn.LSTM(
                 input_size=embedding_size,
                 hidden_size=self.hidden_size,
-                num_layers=n_layers_2,
+                num_layers=n_layers_1,
                 batch_first=True
             )
             self.LSTM1 = nn.LSTM(
                 input_size=self.hidden_size,
                 hidden_size=self.output_size,
-                num_layers=n_layers_1,
+                num_layers=n_layers_2,
                 batch_first=True
             )
 
@@ -103,13 +103,13 @@ class Decoder(nn.Module):
             self.LSTMdec = nn.LSTM(
                 input_size=latent_dim,
                 hidden_size=embedding_size,
-                num_layers=n_layers_2,
+                num_layers=n_layers_1,
                 batch_first=True
             )
             self.LSTM1 = nn.LSTM(
                 input_size=embedding_size,
                 hidden_size=self.hidden_size,
-                num_layers=n_layers_1,
+                num_layers=n_layers_2,
                 batch_first=True
             )
             self.fc = nn.Linear(self.hidden_size, output_size)
