@@ -321,7 +321,8 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
             if kld == 'custom':
                 x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
                 recon_loss = loss_function(x, pars, Nf_lognorm,
-                                           Nf_binomial).sum(-1).mean()
+                                           Nf_binomial).mean()
+                #recon_loss = nn.MSELoss()(x, y)
 
                 # KLD = KL_loss_forVAE(mu, sigma).mean()
                 KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
@@ -330,6 +331,7 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
                 x, mu, log_var, pars = model(batch[0].to(device))
                 recon_loss = loss_function(x, pars, Nf_lognorm,
                                            Nf_binomial).mean()
+                #recon_loss = nn.MSELoss()(x, pars[0])
                 #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
                 KLD = KL_loss(mu, log_var)
 
@@ -353,13 +355,14 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
                     x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
                     recon_loss = loss_function(x, pars, Nf_lognorm,
                                                Nf_binomial).mean()
-                    # KLD = KL_loss_forVAE(mu, sigma).mean()
+                    #recon_loss = nn.MSELoss()(x, pars[0])
                     KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
                 if kld == 'vanilla':
                     x, mu, log_var, pars = model(batch[0].to(device))
                     recon_loss = loss_function(x, pars, Nf_lognorm,
-                                               Nf_binomial).sum(-1).mean()
+                                               Nf_binomial).mean()
+                    #recon_loss = nn.MSELoss()(x, pars[0])
                     # KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
                     KLD = KL_loss(mu, log_var)
 

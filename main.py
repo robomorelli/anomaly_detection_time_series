@@ -207,7 +207,7 @@ if __name__ == '__main__':
     parser1.add_argument("--patience", default=5, help="ns")
     parser1.add_argument("--lr", default=0.0009, help="nus")
     parser1.add_argument("--out_window", default=5, help="sequence lenght of the output")
-    parser1.add_argument("--sequence_length", default=40, help="sequence_length")
+    parser1.add_argument("--sequence_length", default=16, help="sequence_length")
 
     # conv architecture (1D and 2D)
     parser1.add_argument("--n_layers", default=1, help="")
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     parser1.add_argument("--n_layers_1", default=1, help="")
     parser1.add_argument("--n_layers_2", default=1, help="")
     parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
-    parser1.add_argument("--latent_dim", default=400, help="")
+    parser1.add_argument("--latent_dim", default=1000, help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
     parser1.add_argument("--kld", default='vanilla', help="[vanilla, custom]")
