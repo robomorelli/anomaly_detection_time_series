@@ -309,6 +309,8 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
         Nf_lognorm = no_features
         Nf_binomial = 0
 
+    parameters_number = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    param_conf.update({'pars_num':parameters_number})
 
     train_loss = 0.0
     val_loss = 10 ** 16
