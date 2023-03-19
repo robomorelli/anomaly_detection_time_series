@@ -97,6 +97,9 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
 
     early_stopping = EarlyStopping(patience=patience)
 
+    parameters_number = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    param_conf.update({'pars_num':parameters_number})
+
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 

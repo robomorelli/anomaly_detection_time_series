@@ -191,6 +191,8 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    parameters_number = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    param_conf.update({'pars_num':parameters_number})
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):

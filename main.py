@@ -192,7 +192,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm, lstm_ae, lstm_vae,"
+    parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
                                                                 " lstm_vae_vanilla, conv_ae, conv_ae1D")
     #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     parser1.add_argument("--n_layers_1", default=1, help="")
     parser1.add_argument("--n_layers_2", default=1, help="")
     parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
-    parser1.add_argument("--latent_dim", default=1000, help="")
+    parser1.add_argument("--latent_dim", default=100, help="")
 
     parser1.add_argument("--N_binomial", default=1, help="number of epochs")
     parser1.add_argument("--kld", default='vanilla', help="[vanilla, custom]")
