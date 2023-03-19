@@ -80,7 +80,7 @@ def main(args1, args2):
     train_dataset = Dataset_seq(df_train, target = args1.target, sequence_length = args1.sequence_length,
                                 out_window = args1.out_window, prediction=args2.predict, forecast_all=args2.forecast_all,
                                 transform=transform)
-    train_iter = DataLoader(dataset=train_dataset, batch_size=args1.batch_size, shuffle=True)
+    train_iter = DataLoader(dataset=train_dataset, batch_size=args1.batch_size, shuffle=True, num_workers=12)
 
     #######################################################
     # Check the index sampled with shuffle false or true:
@@ -88,7 +88,7 @@ def main(args1, args2):
     #######################################################
     test_dataset = Dataset_seq(df_test, target = args1.target, sequence_length = args1.sequence_length, forecast_all=args2.forecast_all,
                                 out_window = args1.out_window, prediction=args2.predict, transform=transform)
-    test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=False)
+    test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=False, num_workers=12)
 
     if 'conv' not in args1.architecture:
         if args1.scaled:
@@ -143,7 +143,8 @@ def main(args1, args2):
     elif args1.architecture == "lstm_vae":
         model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
                         output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers=args1.n_layers).to(device)
+                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers_1=args1.n_layers_1,
+                         n_layers_2=args1.n_layers_2, kld=args1.kld).to(device)
         criterion = None
         optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
@@ -191,7 +192,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='conv_ae1D', help="[lstm, lstm_ae, lstm_vae,"
+    parser1.add_argument("--architecture", default='lstm_vae', help="[lstm, lstm_ae, lstm_vae,"
                                                                 " lstm_vae_vanilla, conv_ae, conv_ae1D")
     #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
@@ -200,7 +201,7 @@ if __name__ == '__main__':
     parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
     parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
     parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
-    parser1.add_argument("--batch_size", default=500, help="batch size")
+    parser1.add_argument("--batch_size", default=100, help="batch size")
 
     parser1.add_argument("--epochs", default=50, help="ns")
     parser1.add_argument("--patience", default=5, help="ns")
@@ -224,8 +225,8 @@ if __name__ == '__main__':
 
     # lstm architecture
     parser1.add_argument("--embedding_dim", default=32, help="s")
-    parser1.add_argument("--n_layers_1", default=2, help="")
-    parser1.add_argument("--n_layers_2", default=2, help="")
+    parser1.add_argument("--n_layers_1", default=1, help="")
+    parser1.add_argument("--n_layers_2", default=1, help="")
     #parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
     parser1.add_argument("--latent_dim", default=100, help="")
 

@@ -174,6 +174,7 @@ class Decoder_vae(nn.Module):
         self.par2 = nn.Linear(self.hidden_size, self.Nf_lognorm)
         self.par3 = nn.Linear(self.hidden_size, self.Nf_lognorm)
 
+
     def forward(self, z):
 
         z = z.unsqueeze(1).repeat(1, self.seq_len, 1) #x[0,0,:]==x[0,1,:] ## we nedd to repeat to have an output of secquences (how is our target)
