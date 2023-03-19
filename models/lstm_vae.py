@@ -15,7 +15,7 @@ torch.manual_seed(0)
 
 class Encoder_vae(nn.Module):
     def __init__(self, seq_in, no_features, embedding_size, latent_dim
-                 , n_layers_1=1, n_layers_2=1, kld='vanilla'):
+                 , n_layers_1=1, n_layers_2=1, kld_type='vanilla'):
         super().__init__()
 
         # self.seq_len = seq_in
@@ -25,11 +25,12 @@ class Encoder_vae(nn.Module):
         self.n_layers_2 = n_layers_2
         self.hidden_size = (2 * embedding_size)  # The number of features in the hidden state h
         self.latent_dim = latent_dim
+        self.kld_type=kld_type
 
-        ''' 
+
         self.act2 = InverseSquareRootLinearUnit()
         self.ClippedTanh0 = ClippedTanh0()
-        '''
+
 
         self.LSTMenc = nn.LSTM(
             input_size=no_features,
@@ -62,23 +63,27 @@ class Encoder_vae(nn.Module):
         )
         '''
 
-        self.mu = nn.Linear(embedding_size, latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
-        self.logvar = nn.Linear(embedding_size, latent_dim)
-        #self.sigma = nn.Linear(embedding_size, latent_dim)
+        if self.kld_type=='vanilla':
+            self.mu = nn.Linear(embedding_size, latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
+            self.dispersion = nn.Linear(embedding_size, latent_dim)
 
-        ''' 
-        self.h1_prior = nn.Linear(no_features, 1)
-        self.h1_prior.weight.data.fill_(0)
-        self.h1_prior.bias.data.fill_(1)
+        else:
+            raise NotImplementedError
+            self.h1_prior = nn.Linear(no_features, 1)
+            self.h1_prior.weight.data.fill_(0)
+            self.h1_prior.bias.data.fill_(1)
 
-        self.mu_prior = nn.Linear(1,  latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
-        self.mu_prior.weight.data.fill_(0)
-        self.mu_prior.bias.data.fill_(0)
+            self.mu_prior = nn.Linear(1,  latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
+            self.mu_prior.weight.data.fill_(0)
+            self.mu_prior.bias.data.fill_(0)
 
-        self.sigma_prior_preActivation = nn.Linear(1, latent_dim)
-        self.sigma_prior_preActivation.weight.data.fill_(0)
-        self.sigma_prior_preActivation.bias.data.fill_(1)
-        '''
+            self.sigma_prior_preActivation = nn.Linear(1, latent_dim)
+            self.sigma_prior_preActivation.weight.data.fill_(0)
+            self.sigma_prior_preActivation.bias.data.fill_(1)
+
+            self.dispersion = nn.Linear(embedding_size, latent_dim)
+            self.mu = nn.Linear(embedding_size, latent_dim)
+
 
         def _init_weights(self, module):
             if isinstance(module, nn.Embedding):
@@ -93,9 +98,6 @@ class Encoder_vae(nn.Module):
         # Inputs: input, (h_0, c_0). -> If (h_0, c_0) is not provided, both h_0 and c_0 default to zero.
         # x is the output and so the size is > (batch, seq_len, hidden_size)
 
-        #fixed_input = self.ClippedTanh0(x)
-        #fixed_input = fixed_input[:, -1, :]
-
         x, (hidden_state, cell_state) = self.LSTMenc(x)
         #x, (hidden_state, cell_state) = self.LSTM1(x)
         last_lstm_layer_hidden_state = hidden_state[-1, :, :]
@@ -105,9 +107,23 @@ class Encoder_vae(nn.Module):
         # each sequence
 
         mu = self.mu(last_lstm_layer_hidden_state)
-        logvar = self.logvar(last_lstm_layer_hidden_state)
-        #sigma = self.act2(self.sigma(last_lstm_layer_hidden_state))
-
+        if self.kld_type =='vanilla':
+            logvar = self.dispersion(last_lstm_layer_hidden_state)
+            return mu, logvar
+        else:
+            raise NotImplementedError
+            '''
+            fixed_input = self.ClippedTanh0(x)
+            fixed_input = fixed_input[:, -1, :]
+            with torch.no_grad():
+                h1_prior = self.h1_prior(fixed_input)
+            mu_prior = self.mu_prior(h1_prior)
+            sigma_prior_preActivation = self.sigma_prior_preActivation(h1_prior)
+            sigma_prior = self.act2(sigma_prior_preActivation)
+            sigma = self.act2(self.dispersion(last_lstm_layer_hidden_state))
+            
+            return mu, sigma, mu_prior, sigma_prior
+            '''
 
         ########### TO IMPLEMENT???###############
         ########### TO IMPLEMENT???###############
@@ -119,28 +135,10 @@ class Encoder_vae(nn.Module):
         ########### TO IMPLEMENT???###############
 
 
-        '''
-        with torch.no_grad():
-            h1_prior = self.h1_prior(fixed_input)
-        '''
-
-        #x, (hidden_state, cell_state) = self.LSTMenc_prior(h1_prior)
-        #x, (hidden_state, cell_state) = self.LSTM1_enc_prior(x)
-        #last_lstm_layer_hidden_state = hidden_state[-1, :, :]
-
-        ''' 
-        mu_prior = self.mu_prior(h1_prior)
-
-        sigma_prior_preActivation = self.sigma_prior_preActivation(h1_prior)
-        sigma_prior = self.act2(sigma_prior_preActivation)
-        '''
-
-        return mu, logvar # mu, sigma, mu_prior, sigma_prior
-
 
 # (2) Decoder
 class Decoder_vae(nn.Module):
-    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers_1=1, n_layers_2=1, batch_size=500):
+    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers_1=1, n_layers_2=1, batch_size=500, recon_loss_type='custom'):
         super().__init__()
 
         self.seq_len = seq_out
@@ -152,6 +150,7 @@ class Decoder_vae(nn.Module):
         self.latent_dim = latent_dim
         self.Nf_lognorm = output_size
         self.batch_size=batch_size
+        self.recon_loss_type= recon_loss_type
 
 
         self.act2 = InverseSquareRootLinearUnit()
@@ -188,8 +187,9 @@ class Decoder_vae(nn.Module):
         self.c_0 = torch.zeros(self.n_layers_1, self.batch_size, self.embedding_size, requires_grad=True).type(torch.float)
 
         self.par1 = nn.Linear(self.embedding_size, output_size)
-        self.par2 = nn.Linear(self.embedding_size, self.Nf_lognorm)
-        self.par3 = nn.Linear(self.embedding_size, self.Nf_lognorm)
+        if self.recon_loss_type=='custom':
+            self.par2 = nn.Linear(self.embedding_size, self.Nf_lognorm)
+            self.par3 = nn.Linear(self.embedding_size, self.Nf_lognorm)
 
 
     def forward(self, z):
@@ -214,16 +214,17 @@ class Decoder_vae(nn.Module):
         h_0 = torch.stack([h_state for _ in range(self.n_layers_1)])
         decoder_output, _ = self.LSTMdec(self.decoder_inputs, (h_0, self.c_0))
 
-        par2 = self.par2(decoder_output)
-        par3 = self.par3(decoder_output)
-
-        return self.par1(decoder_output), self.act2(par2), self.act3(par3)
-
+        if self.recon_loss_type == 'custom':
+            par2 = self.par2(decoder_output)
+            par3 = self.par3(decoder_output)
+            return self.par1(decoder_output), self.act2(par2), self.act3(par3)
+        else:
+            return self.par1(decoder_output)
 
 class LSTM_VAE(nn.Module):
     def __init__(self, seq_in, seq_out, no_features, output_size
                  , embedding_dim, latent_dim, Nf_lognorm, Nf_binomial, n_layers_1=1
-                 ,n_layers_2=1,  kld='vanilla', batch_size=500):
+                 ,n_layers_2=1,  kld_type='vanilla', recon_loss_type='custom', batch_size=500):
         super().__init__()
 
         self.seq_in = seq_in
@@ -236,13 +237,14 @@ class LSTM_VAE(nn.Module):
         self.output_size = output_size
         self.latent_dim = latent_dim
         self.Nf_lognorm = Nf_lognorm
-        self.kld = kld
+        self.kld_type = kld_type
         self.batch_size=batch_size
+        self.recon_loss_type = recon_loss_type
 
         self.encoder = Encoder_vae(self.seq_in, self.no_features, self.embedding_dim, self.latent_dim, self.n_layers_1,
-                                   self.n_layers_2, kld=self.kld)
+                                   self.n_layers_2, kld_type=self.kld_type)
         self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers_1,
-                                   self.n_layers_2, batch_size=self.batch_size)
+                                   self.n_layers_2, batch_size=self.batch_size, recon_loss_type=self.recon_loss_type)
 
         self.apply(self.weight_init)
         print(self)
@@ -253,26 +255,28 @@ class LSTM_VAE(nn.Module):
             nn.init.zeros_(m.bias)
 
     def sample(self, mu, dispersion):
-        if self.kld=='custom':
+        if self.kld_type=='custom':
             std = dispersion
             eps = torch.randn_like(std)
             return mu + eps * std
-        elif self.kld=='vanilla':
+        elif self.kld_type=='vanilla':
             std = torch.exp(0.5 * dispersion)
             eps = torch.randn_like(std)
             return mu + eps * std
 
     def forward(self, x):
         torch.manual_seed(0)
-        if self.kld == 'vanilla':
+        if self.kld_type == 'vanilla':
             mu, logvar = self.encoder(x)
             z = self.sample(mu, logvar)
+            # add pars = y for mse loss
             pars = self.decoder(z)
             return x, mu, logvar, pars
 
-        elif self.kld == 'custom':
+        elif self.kld_type == 'custom':
             mu, sigma, mu_prior, sigma_prior = self.encoder(x)
             z = self.sample(mu, sigma)
+            # add pars = y for mse loss
             pars = self.decoder(z)
             return x, mu, sigma, mu_prior, sigma_prior, pars
 
@@ -289,7 +293,8 @@ class LSTM_VAE(nn.Module):
 
 
 def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
-          device, out_dir, model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=100, kld_factor = 1, kld='vanilla'):
+          device, out_dir, model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=100, kld_factor = 1,
+                   recon_loss_type = 'custom', kld_type='vanilla'):
 
     """
     Training function.
@@ -320,21 +325,29 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
             model.train()
             optimizer.zero_grad()
 
-            if kld == 'custom':
-                x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
-                recon_loss = loss_function(x, pars, Nf_lognorm,
+            if kld_type == 'custom':
+                if recon_loss_type == 'custom':
+                    x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
+                    recon_loss = loss_function(x, pars, Nf_lognorm,
                                            Nf_binomial).mean()
-                #recon_loss = nn.MSELoss()(x, y)
+                    mse_loss = nn.MSELoss()(x, pars[0])
+                else:
+                    x, mu, sigma, mu_prior, sigma_prior, y = model(batch[0].to(device))
+                    recon_loss = nn.MSELoss()(x, y)
 
-                # KLD = KL_loss_forVAE(mu, sigma).mean()
                 KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
-            if kld == 'vanilla':
-                x, mu, log_var, pars = model(batch[0].to(device))
-                recon_loss = loss_function(x, pars, Nf_lognorm,
+            if kld_type == 'vanilla':
+                if recon_loss_type == 'custom':
+                    x, mu, log_var, pars = model(batch[0].to(device))
+                    recon_loss = loss_function(x, pars, Nf_lognorm,
                                            Nf_binomial).mean()
-                #recon_loss = nn.MSELoss()(x, pars[0])
-                #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+                    mse_loss = nn.MSELoss()(x, pars[0])
+
+                else:
+                    x, mu, log_var, y = model(batch[0].to(device))
+                    recon_loss = nn.MSELoss()(x, y)
+
                 KLD = KL_loss(mu, log_var)
 
             loss = recon_loss + kld_factor * KLD  # the sum of KL is added to the mean of MSE
@@ -344,7 +357,10 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
 
             if i % 100 == 0:
                 print("Loss:")
-                print("loss {}: recon loss {} and kld {}".format(loss, recon_loss, KLD))
+                if recon_loss_type=='custom':
+                    print("loss {}: recon loss {} and kld {} mse_loss {}".format(loss, recon_loss, KLD, mse_loss))
+                else:
+                    print("loss {}: recon loss {} and kld {} ".format(loss, recon_loss, KLD))
                 print(loss.item())
 
         model.eval()
@@ -353,28 +369,33 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
 
-                if kld == 'custom':
-                    x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
-                    recon_loss = loss_function(x, pars, Nf_lognorm,
-                                               Nf_binomial).mean()
-                    #recon_loss = nn.MSELoss()(x, pars[0])
+                if kld_type == 'custom':
+                    if recon_loss_type == 'custom':
+                        x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
+                        recon_loss = loss_function(x, pars, Nf_lognorm,
+                                                   Nf_binomial).mean()
+                        mse_loss = nn.MSELoss()(x, pars[0])
+                    else:
+                        x, mu, sigma, mu_prior, sigma_prior, y = model(batch[0].to(device))
+                        recon_loss = nn.MSELoss()(x, y)
+
                     KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
-                if kld == 'vanilla':
-                    x, mu, log_var, pars = model(batch[0].to(device))
-                    recon_loss = loss_function(x, pars, Nf_lognorm,
-                                               Nf_binomial).mean()
-                    #recon_loss = nn.MSELoss()(x, pars[0])
-                    # KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+                if kld_type == 'vanilla':
+                    if recon_loss_type == 'custom':
+                        x, mu, log_var, pars = model(batch[0].to(device))
+                        recon_loss = loss_function(x, pars, Nf_lognorm,
+                                                   Nf_binomial).mean()
+                        mse_loss = nn.MSELoss()(x, pars[0])
+
+                    else:
+                        x, mu, log_var, y = model(batch[0].to(device))
+                        recon_loss = nn.MSELoss()(x, y)
+
                     KLD = KL_loss(mu, log_var)
 
-                temp_val_loss += loss
+                temp_val_loss += recon_loss + kld_factor * KLD
                 val_steps += 1
-
-            if i % 100 == 0:
-                print("Loss:")
-                print("loss {}: recon loss {} and kld {}".format(loss, recon_loss, KLD))
-                print(loss.item())
 
             temp_val_loss = temp_val_loss / val_steps
             scheduler.step()
