@@ -14,32 +14,37 @@ torch.manual_seed(0)
 # annotation sourced by  ttps://pytorch.org/docs/stable/nn.html#torch.nn.LSTM
 
 class Encoder_vae(nn.Module):
-    def __init__(self, seq_in, no_features, embedding_size, latent_dim, n_layers=1):
+    def __init__(self, seq_in, no_features, embedding_size, latent_dim
+                 , n_layers_1=1, n_layers_2=1, kld='vanilla'):
         super().__init__()
 
         # self.seq_len = seq_in
         self.no_features = no_features  # The number of expected features(= dimension size) in the input x
         self.embedding_size = embedding_size  # the number of features in the embedded points of the inputs' number of features
-        self.n_layers = n_layers
+        self.n_layers_1 = n_layers_1
+        self.n_layers_2 = n_layers_2
         self.hidden_size = (2 * embedding_size)  # The number of features in the hidden state h
         self.latent_dim = latent_dim
 
+        ''' 
         self.act2 = InverseSquareRootLinearUnit()
         self.ClippedTanh0 = ClippedTanh0()
+        '''
 
         self.LSTMenc = nn.LSTM(
             input_size=no_features,
             hidden_size=self.hidden_size,
-            num_layers=n_layers,
+            num_layers=n_layers_1,
             batch_first=True
         )
         self.LSTM1 = nn.LSTM(
             input_size=self.hidden_size,
             hidden_size=embedding_size,
-            num_layers=n_layers,
+            num_layers=n_layers_2,
             batch_first=True
         )
 
+        ''' 
         self.LSTMenc_prior = nn.LSTM(
             input_size=1,
             hidden_size=self.hidden_size,
@@ -52,10 +57,13 @@ class Encoder_vae(nn.Module):
             num_layers=n_layers,
             batch_first=True
         )
+        '''
 
         self.mu = nn.Linear(embedding_size, latent_dim)  # nn.Linear takes as input_size the last dimension of the tensor
-        self.sigma = nn.Linear(embedding_size, latent_dim)
+        self.logvar = nn.Linear(embedding_size, latent_dim)
+        #self.sigma = nn.Linear(embedding_size, latent_dim)
 
+        ''' 
         self.h1_prior = nn.Linear(no_features, 1)
         self.h1_prior.weight.data.fill_(0)
         self.h1_prior.bias.data.fill_(1)
@@ -67,6 +75,7 @@ class Encoder_vae(nn.Module):
         self.sigma_prior_preActivation = nn.Linear(1, latent_dim)
         self.sigma_prior_preActivation.weight.data.fill_(0)
         self.sigma_prior_preActivation.bias.data.fill_(1)
+        '''
 
         def _init_weights(self, module):
             if isinstance(module, nn.Embedding):
@@ -77,16 +86,12 @@ class Encoder_vae(nn.Module):
                     module.bias.data.zero_()
                     module.weight.data.fill_(1.0)
 
-        #_init_weights(self.mu_layer)
-        #_init_weights(self.si)
-
-
     def forward(self, x):
         # Inputs: input, (h_0, c_0). -> If (h_0, c_0) is not provided, both h_0 and c_0 default to zero.
         # x is the output and so the size is > (batch, seq_len, hidden_size)
 
-        fixed_input = self.ClippedTanh0(x)
-        fixed_input = fixed_input[:, -1, :]
+        #fixed_input = self.ClippedTanh0(x)
+        #fixed_input = fixed_input[:, -1, :]
 
         x, (hidden_state, cell_state) = self.LSTMenc(x)
         x, (hidden_state, cell_state) = self.LSTM1(x)
@@ -97,7 +102,9 @@ class Encoder_vae(nn.Module):
         # each sequence
 
         mu = self.mu(last_lstm_layer_hidden_state)
-        sigma = self.act2(self.sigma(last_lstm_layer_hidden_state))
+        logvar = self.logvar(last_lstm_layer_hidden_state)
+        #sigma = self.act2(self.sigma(last_lstm_layer_hidden_state))
+
 
         ########### TO IMPLEMENT???###############
         ########### TO IMPLEMENT???###############
@@ -108,30 +115,36 @@ class Encoder_vae(nn.Module):
         ########### TO IMPLEMENT???###############
         ########### TO IMPLEMENT???###############
 
+
+        '''
         with torch.no_grad():
             h1_prior = self.h1_prior(fixed_input)
+        '''
 
         #x, (hidden_state, cell_state) = self.LSTMenc_prior(h1_prior)
         #x, (hidden_state, cell_state) = self.LSTM1_enc_prior(x)
         #last_lstm_layer_hidden_state = hidden_state[-1, :, :]
 
+        ''' 
         mu_prior = self.mu_prior(h1_prior)
 
         sigma_prior_preActivation = self.sigma_prior_preActivation(h1_prior)
         sigma_prior = self.act2(sigma_prior_preActivation)
+        '''
 
-        return mu, sigma, mu_prior, sigma_prior
+        return mu, logvar # mu, sigma, mu_prior, sigma_prior
 
 
 # (2) Decoder
 class Decoder_vae(nn.Module):
-    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers=1):
+    def __init__(self, seq_out, embedding_size, output_size, latent_dim, n_layers_1=1, n_layers_2=1):
         super().__init__()
 
         self.seq_len = seq_out
         self.embedding_size = embedding_size
         self.hidden_size = (2 * embedding_size)
-        self.n_layers = n_layers
+        self.n_layers_1 = n_layers_1
+        self.n_layers_2 = n_layers_2
         self.output_size = output_size
         self.latent_dim = latent_dim
         self.Nf_lognorm = output_size
@@ -142,13 +155,13 @@ class Decoder_vae(nn.Module):
         self.LSTMdec = nn.LSTM(
             input_size=latent_dim,
             hidden_size=embedding_size,
-            num_layers=n_layers,
+            num_layers=n_layers_1,
             batch_first=True
         )
         self.LSTM1 = nn.LSTM(
             input_size=embedding_size,
             hidden_size=self.hidden_size,
-            num_layers=n_layers,
+            num_layers=n_layers_2,
             batch_first=True
         )
 
@@ -160,6 +173,7 @@ class Decoder_vae(nn.Module):
         self.par1 = nn.Linear(self.hidden_size, output_size)
         self.par2 = nn.Linear(self.hidden_size, self.Nf_lognorm)
         self.par3 = nn.Linear(self.hidden_size, self.Nf_lognorm)
+
 
     def forward(self, z):
 
@@ -180,7 +194,8 @@ class Decoder_vae(nn.Module):
 
 class LSTM_VAE(nn.Module):
     def __init__(self, seq_in, seq_out, no_features, output_size
-                 , embedding_dim, latent_dim, Nf_lognorm, Nf_binomial, n_layers):
+                 , embedding_dim, latent_dim, Nf_lognorm, Nf_binomial, n_layers_1=1
+                 ,n_layers_2=1,  kld='vanilla'):
         super().__init__()
 
         self.seq_in = seq_in
@@ -188,35 +203,49 @@ class LSTM_VAE(nn.Module):
         self.no_features = no_features
         self.embedding_dim = embedding_dim
         self.hidden_size = 2*embedding_dim
-        self.n_layers = n_layers
+        self.n_layers_1 = n_layers_1
+        self.n_layers_2 = n_layers_2
         self.output_size = output_size
         self.latent_dim = latent_dim
         self.Nf_lognorm = Nf_lognorm
+        self.kld = kld
 
-        self.encoder = Encoder_vae(self.seq_in, self.no_features, self.embedding_dim, self.latent_dim, self.n_layers)
-        self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers)
+        self.encoder = Encoder_vae(self.seq_in, self.no_features, self.embedding_dim, self.latent_dim, self.n_layers_1,
+                                   self.n_layers_2, kld=self.kld)
+        self.decoder = Decoder_vae(self.seq_out, self.embedding_dim, self.output_size, self.latent_dim, self.n_layers_1,
+                                   self.n_layers_2)
 
         self.apply(self.weight_init)
+        print(self)
     @staticmethod
     def weight_init(m):
         if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):
             nn.init.kaiming_normal_(m.weight)
             nn.init.zeros_(m.bias)
 
-    def sample(self, mu, sigma):
-        std = sigma
-        eps = torch.randn_like(std)
-        return mu + eps * std
+    def sample(self, mu, dispersion):
+        if self.kld=='custom':
+            std = dispersion
+            eps = torch.randn_like(std)
+            return mu + eps * std
+        elif self.kld=='vanilla':
+            std = torch.exp(0.5 * dispersion)
+            eps = torch.randn_like(std)
+            return mu + eps * std
 
     def forward(self, x):
         torch.manual_seed(0)
-        #mu, var, sigma = self.encoder(x)
-        mu, sigma, mu_prior, sigma_prior = self.encoder(x)
-        #sigma = torch.exp(0.5*log_var)
-        z = self.sample(mu, sigma)
-        pars = self.decoder(z)
+        if self.kld == 'vanilla':
+            mu, logvar = self.encoder(x)
+            z = self.sample(mu, logvar)
+            pars = self.decoder(z)
+            return x, mu, logvar, pars
 
-        return x, mu, sigma, mu_prior, sigma_prior, pars
+        elif self.kld == 'custom':
+            mu, sigma, mu_prior, sigma_prior = self.encoder(x)
+            z = self.sample(mu, sigma)
+            pars = self.decoder(z)
+            return x, mu, sigma, mu_prior, sigma_prior, pars
 
     def encode(self, x):
         self.eval()
@@ -229,18 +258,9 @@ class LSTM_VAE(nn.Module):
         squeezed_decoded = decoded.squeeze()
         return squeezed_decoded
 
-    def load(self, PATH):
-        """
-        Loads the model's parameters from the path mentioned
-        :param PATH: Should contain pickle file
-        :return: None
-        """
-        self.is_fitted = True
-        self.load_state_dict(torch.load(PATH))
-
 
 def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
-          device, out_dir, model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=100, kld_factor = 1):
+          device, out_dir, model_name,  Nf_lognorm=None, Nf_binomial=None, epochs=100, kld_factor = 1, kld='vanilla'):
 
     """
     Training function.
@@ -265,32 +285,33 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
         train_loss = 0.0
-        train_steps = 0
         for i, batch in tqdm(enumerate(train_iter), total=len(train_iter), unit="batch"):
             model.train()
             optimizer.zero_grad()
 
-            x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
+            if kld == 'custom':
+                x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
+                recon_loss = loss_function(x, pars, Nf_lognorm,
+                                           Nf_binomial).sum(-1).mean()
 
-            recon_loss = loss_function(x, pars, Nf_lognorm,
-                                       Nf_binomial).mean()
-            # KLD = KL_loss_forVAE(mu, sigma).mean()
-            KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
+                # KLD = KL_loss_forVAE(mu, sigma).mean()
+                KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
-            # log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
-            # KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
+            if kld == 'vanilla':
+                x, mu, log_var, pars = model(batch[0].to(device))
+                recon_loss = loss_function(x, pars, Nf_lognorm,
+                                           Nf_binomial).sum(-1).mean()
+                #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+                KLD = KL_loss(mu, log_var)
+
             loss = recon_loss + kld_factor * KLD  # the sum of KL is added to the mean of MSE
-
             loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
             train_loss += loss.item()
-
-            # if (i + 1) % config['gradient_accumulation_steps'] == 0:
             optimizer.step()
 
             if i % 100 == 0:
                 print("Loss:")
-                print("kld {}".format(KLD))
+                print("loss {}: recon loss {} and kld {}".format(loss, recon_loss, KLD))
                 print(loss.item())
 
         model.eval()
@@ -299,20 +320,27 @@ def train_lstm_vae(param_conf, no_features, train_iter, test_iter, model, criter
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
 
-                x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
+                if kld == 'custom':
+                    x, mu, sigma, mu_prior, sigma_prior, pars = model(batch[0].to(device))
+                    recon_loss = loss_function(x, pars, Nf_lognorm,
+                                               Nf_binomial).sum(-1).mean()
+                    # KLD = KL_loss_forVAE(mu, sigma).mean()
+                    KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
 
-                recon_loss = loss_function(x, pars, Nf_lognorm,
-                                           Nf_binomial).mean()
-
-                #KLD = KL_loss_forVAE(mu, sigma).mean()
-                KLD = KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior).mean()
-
-                #log_var = torch.log(torch.mul(sigma_prior, sigma_prior))
-                #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())  ### Try with this one
-                loss = recon_loss +  kld_factor * KLD  # the sum of KL is added to the mean of MSE
+                if kld == 'vanilla':
+                    x, mu, log_var, pars = model(batch[0].to(device))
+                    recon_loss = loss_function(x, pars, Nf_lognorm,
+                                               Nf_binomial).sum(-1).mean()
+                    # KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+                    KLD = KL_loss(mu, log_var)
 
                 temp_val_loss += loss
                 val_steps += 1
+
+            if i % 100 == 0:
+                print("Loss:")
+                print("loss {}: recon loss {} and kld {}".format(loss, recon_loss, KLD))
+                print(loss.item())
 
             temp_val_loss = temp_val_loss / val_steps
             scheduler.step()

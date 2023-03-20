@@ -86,6 +86,7 @@ class LinConstr(nn.Module):
         return x
 
 
+''' 
 def KL_loss_forVAE(mu, sigma):
     mu_prior = torch.tensor(0)
     sigma_prior = torch.tensor(1)
@@ -94,6 +95,7 @@ def KL_loss_forVAE(mu, sigma):
     kl_loss += torch.mul(div, div)
     kl_loss += torch.log(torch.div(sigma_prior, sigma)) -1
     return 0.5 * torch.sum(kl_loss, axis=-1)
+'''
 
 def KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior):
 
@@ -113,8 +115,10 @@ def KL_loss_forVAE_custom(mu, sigma, mu_prior, sigma_prior):
 #    return kl_loss
 
 def KL_loss(mu, log_var):
-    kl = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-    kl = kl.sum(-1)     # to go from multi-dimensional z to single dimensional z : (batch_size x latent_size) ---> (batch_size)
+    #kl = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    #kl = kl.sum(-1)
+    kl = -0.5 * ((1 + log_var - mu.pow(2) - log_var.exp()).sum(-1))
+     # to go from multi-dimensional z to single dimensional z : (batch_size x latent_size) ---> (batch_size)
                             # i.e Z = [ [z1_1, z1_2 , ...., z1_lt] ] ------> z = [ z1]
                             #         [ [z2_1, z2_2, ....., z2_lt] ]             [ z2]
                             #                   .                                [ . ]
