@@ -8,7 +8,7 @@ from models.lstm_ae import *
 from models.lstm import *
 from models.lstm_vae import *
 from models.lstm_vae_vanilla import *
-from models.conv_ae import 
+from models.conv_ae import *
 from models.conv_ae_1D import *
 from models.conv_ae_1D_gpt import *
 from config import *
