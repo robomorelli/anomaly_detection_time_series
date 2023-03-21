@@ -16,8 +16,23 @@ import argparse
 from torchvision.transforms import transforms as T, Lambda
 import platform
 from datetime import datetime
+from omegaconf import OmegaConf
+from omegaconf import DictConfig
+import click
+import yaml
+import json
+import types
 
-def main(args1, args2):
+def load_object(dct):
+    return types.SimpleNamespace(**dct)
+
+@click.command()
+@click.option('-c', '--config-name', type=click.Path())
+def main(args1, config_name: DictConfig):
+
+    cfg = yaml.load(open(os.path.join('./config/', config_name), 'r'), Loader=yaml.Loader)
+    cfg = json.loads(json.dumps(cfg), object_hook=load_object)
+
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
 
     try:
@@ -151,18 +166,6 @@ def main(args1, args2):
                   device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
                        Nf_lognorm=None, Nf_binomial=None, kld_factor = 1)
 
-    elif args1.architecture == "lstm_vae_vanilla":
-        model = LSTM_VAEV(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
-                        output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                         n_layers=args1.n_layers).to(device)
-        criterion = None
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-
-        train_lstm_vae_vanilla(param_conf, n_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
-                  device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
-                Nf_lognorm=None, Nf_binomial=None, kld_factor = 0.01)
-
     elif args1.architecture == "conv_ae":
         model = CONV_AE(in_channel=1,  heigth=args1.sequence_length, width=len(args1.columns),
                         kernel_size=args1.kernel_size, filter_num=args1.filter_num,
@@ -191,8 +194,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm', help="[lstm, lstm_ae, lstm_vae,"
-                                                                " lstm_vae_vanilla, conv_ae, conv_ae1D")
+    parser1.add_argument("--architecture", default='lstm', help="[lstm, lstm_ae, lstm_vae, conv_ae, conv_ae1D")
     #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
     parser1.add_argument("--model_path", default=model_results, help="where to save model")
@@ -271,5 +273,8 @@ if __name__ == '__main__':
     args2 = parser2.parse_args()
 
     args1.out_window = args1.sequence_length
-    main(args1, args2)
+
+    conf = OmegaConf.load('config.yaml')
+
+    main(args1, conf)
 
