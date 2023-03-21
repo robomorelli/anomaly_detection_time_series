@@ -191,8 +191,6 @@ def main(args1, config_name: DictConfig):
         train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
                         out_dir=checkpoint_path, model_name=args2.model_name, epochs=args1.epochs)
 
-
-
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
