@@ -29,7 +29,6 @@ def main(args1, args2):
         device='cpu'
 
 
-
     if args1.columns_subset:
         args1.columns = args1.columns[:args1.columns_subset]
     dataRaw = xdf[args1.columns].dropna()
@@ -192,7 +191,7 @@ def main(args1, args2):
 if __name__ == '__main__':
 
     parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm_ae', help="[lstm, lstm_ae, lstm_vae,"
+    parser1.add_argument("--architecture", default='lstm', help="[lstm, lstm_ae, lstm_vae,"
                                                                 " lstm_vae_vanilla, conv_ae, conv_ae1D")
     #dataset
     parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
