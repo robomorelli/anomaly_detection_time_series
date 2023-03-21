@@ -33,6 +33,8 @@ def main(args1, config_name: DictConfig):
     cfg = yaml.load(open(os.path.join('./config/', config_name), 'r'), Loader=yaml.Loader)
     cfg = json.loads(json.dumps(cfg), object_hook=load_object)
 
+    cfg.dataset.out_window = cfg.dataset.seq_length
+
     xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
 
     try:

@@ -4,20 +4,19 @@ dataset:
             'RW3_cmd_volt', 'RW4_cmd_volt', 'RW1_therm',
             'RW2_therm', 'RW3_therm', 'RW4_therm', 'RW1_speed', 'RW2_speed',
             'RW3_speed', 'RW4_speed']
-  train_val_split:
-  shuffle:
-  columns_subset:
-  dataset_subset:
-  batch_size:
-  sampling_rate:
-  scaled:
+  train_val_split: 0.70
+  shuffle: 0
+  columns_subset: 0
+  dataset_subset: 0
+  batch_size: 500
+  sampling_rate: '4s'
+  scaled: 1
 
 opt:
   epochs: 200
   patience: 5
   lr: 0.001
-  out_window:
-  sequence_lenght
+  sequence_lenght: 40
 
 model_hyperparameters:
   name: 'conv_ae1D'
