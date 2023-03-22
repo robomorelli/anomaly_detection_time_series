@@ -1,0 +1,34 @@
+# Dataset
+dataset:
+  name: 'all_2016-2018_clean_std_4s.pkl'
+  sequence_length: 16
+  columns: ['RW1_motcurr', 'RW2_motcurr', 'RW3_motcurr', 'RW4_motcurr',
+            'RW1_cmd_volt', 'RW2_cmd_volt','RW3_cmd_volt', 'RW4_cmd_volt',
+            'RW1_therm','RW2_therm', 'RW3_therm', 'RW4_therm',
+            'RW1_speed', 'RW2_speed', 'RW3_speed', 'RW4_speed']
+  train_val_split: 0.70
+  shuffle: 0
+  columns_subset: 0
+  dataset_subset: 1000000   #subset of rows to select from the original atabases
+  batch_size: 500
+  sampling_rate: '4s'
+  scaled: 1   # standardize the data values
+  target: null # predict or reconstruct one or more specific features
+  forecast: 0 # forecast one or more specific values
+  forecast_all: 0 # forecast all the columns
+  predict: 0 # the columns to forecast is dropped from the original database (in the forecast version the column/s is/are not dropped)
+
+opt:
+  epochs: 200
+  lr: 0.001
+  lr_patience: 5 # learning rate patience
+  es_patience: 10 #early stopping patience
+
+model:
+  architecture: 'lstm'
+  embedding_dim: 64 #hidden size of the second and last encoding LSTM cell (the first cell has a doubled hidden size)
+  latent_dim: 100 # latent space dim
+  n_layers_1: 1 #number of layer of the first lstm cell
+  n_layers_2: 1 #number of layer of the second lstm cell
+
+

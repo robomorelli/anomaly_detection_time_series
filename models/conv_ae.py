@@ -3,6 +3,8 @@ import torch.nn as nn
 from models.utils import conv_block, deconv_block
 import torch
 from tqdm import tqdm
+from utils.opt import EarlyStopping
+from utils.layers import conv_block, deconv_block
 
 class Encoder(nn.Module):
     def __init__(self, in_channel=1, kernel_size=3, filter_num_list=None, latent_dim=10,
@@ -161,7 +163,7 @@ class CONV_AE(nn.Module):
 
 
 def train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer,scheduler, device,
-           out_dir, model_name, epochs=100):
+           out_dir, model_name, epochs=100, es_patience=10):
     """
     Training function.
 
@@ -177,6 +179,7 @@ def train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    early_stopping = EarlyStopping(patience=es_patience)
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
@@ -216,7 +219,12 @@ def train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
 
             temp_val_loss= temp_val_loss / val_steps
             print('eval loss {}'.format(temp_val_loss))
-            scheduler.step()
+            scheduler.step(temp_val_loss)
+
+            early_stopping(temp_val_loss)
+            if early_stopping.early_stop:
+                break
+
             if temp_val_loss < val_loss:
                 print('val_loss improved from {} to {}, saving model  {} to {}' \
                       .format(val_loss, temp_val_loss, model_name, out_dir))

@@ -58,8 +58,9 @@ class Dataset_seq(Dataset):
         if self.transform is not None:
             data = self.transform(data)
             target = self.transform(target)
-
-        return torch.tensor(data).float(), torch.tensor(target).float()
+            return data.float(), target.float()
+        else:
+            return torch.from_numpy(data).float(), torch.from_numpy(target).float()
 
 
 

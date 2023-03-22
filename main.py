@@ -1,41 +1,31 @@
+import torch.nn as nn
 import pandas as pd
-import torch
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 from dataset.sentinel import *
-from models.lstm_ae import *
-from models.lstm import *
-from models.lstm_vae import *
-from models.lstm_vae_vanilla import *
-from models.conv_ae import *
-from models.conv_ae_1D import *
-from models.conv_ae_1D_gpt import *
 from config import *
 import argparse
-from torchvision.transforms import transforms as T, Lambda
-import platform
-from datetime import datetime
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import click
 import yaml
 import json
 import types
+from utils.training import start_train, dataset_preprocessing, dataset_split, get_name, get_transform
 
 def load_object(dct):
     return types.SimpleNamespace(**dct)
 
-@click.command()
-@click.option('-c', '--config-name', type=click.Path())
-def main(args1, config_name: DictConfig):
+#@click.command()
+#@click.option('-c', '--config-name', type=click.Path())
+def main(config_name):
 
-    cfg = yaml.load(open(os.path.join('./config/', config_name), 'r'), Loader=yaml.Loader)
-    cfg = json.loads(json.dumps(cfg), object_hook=load_object)
+    cfg = OmegaConf.load('configuration/{}.yaml'.format(args.config_name))
+    cfg.dataset.out_window = cfg.dataset.sequence_length
+    cfg.dataset.data_path = os.path.join(data_path, 'dataset_{}'.format(cfg.dataset.sampling_rate))
 
-    cfg.dataset.out_window = cfg.dataset.seq_length
-
-    xdf = pd.read_pickle(os.path.join(args2.data_path, args2.dataset))
+    model_name = get_name(cfg)
+    transform = get_transform(cfg)
 
     try:
         sm = str(torch.cuda.get_device_capability())
@@ -45,236 +35,57 @@ def main(args1, config_name: DictConfig):
     except:
         device='cpu'
 
-
-    if args1.columns_subset:
-        args1.columns = args1.columns[:args1.columns_subset]
-    dataRaw = xdf[args1.columns].dropna()
-
-    if args1.dataset_subset:
-        dataRaw = dataRaw.iloc[:args1.dataset_subset, :]
-
-    df = dataRaw.copy()
-    x = df.values
-
-    if args1.scaled:
+    if cfg.dataset.scaled:
         scaler = StandardScaler()
-        x_scaled = scaler.fit_transform(x)
-        dfNorm = pd.DataFrame(x_scaled, columns=df.columns)
+
+    dataset_path = os.path.join(cfg.dataset.data_path, cfg.dataset.name)
+    df_processed = dataset_preprocessing(dataset_path, cfg, scaler)
+    X_train, X_test, y_train, y_test = dataset_split(df_processed, cfg)
+
+    df_train = pd.DataFrame(X_train, columns=cfg.dataset.columns)
+    df_test = pd.DataFrame(X_test, columns=cfg.dataset.columns)
+
+    if cfg.dataset.target != None:
+        cfg.dataset.n_features = len(cfg.dataset.columns) - len(cfg.dataset.target)
     else:
-        dfNorm = pd.DataFrame(x, columns=df.columns)
+        cfg.dataset.n_features = len(cfg.dataset.columns)
+        cfg.dataset.target = cfg.dataset.columns
 
-    # If shuffle is True the sequences are taken from different time and when testing are merged with noisy effect:
-    # two contigous sequences (maybe distant in time) are linked with the line of matplotlib making a noiysy effect
-    if args1.shuffle:
-        X_train, X_test, y_train, y_test = train_test_split(dfNorm, dfNorm, train_size=args1.train_val_split, shuffle=True,
-                                                            random_state=123)
-    else:
-        X_train, X_test, y_train, y_test = train_test_split(dfNorm, dfNorm, train_size=args1.train_val_split, shuffle=False)
+    if 'vae' in cfg.model.architecture:
+        cfg.model.Nf_binomial = cfg.dataset.n_features - cfg.model.Nf_lognorm
 
-    df_train = pd.DataFrame(X_train, columns=dfNorm.columns)
-    df_test = pd.DataFrame(X_test, columns=dfNorm.columns)
-
-
-    if args1.architecture == "conv_ae":
-        transform = T.Compose([
-                               T.ToTensor(),
-                               ])
-    elif args1.architecture == 'conv_ae1D':
-        transform = T.Compose([
-            T.ToTensor(),
-            Lambda(lambda x: x.permute((0, 2, 1))),
-            Lambda(lambda x: x.squeeze(0))
-
-        ])
-
-    else:
-        transform = None
-
-    param_conf = args1.__dict__
-    param_conf.update(args2.__dict__)
-
-    train_dataset = Dataset_seq(df_train, target = args1.target, sequence_length = args1.sequence_length,
-                                out_window = args1.out_window, prediction=args2.predict, forecast_all=args2.forecast_all,
-                                transform=transform)
-    train_iter = DataLoader(dataset=train_dataset, batch_size=args1.batch_size, shuffle=True, num_workers=12)
-
-    #######################################################
-    # Check the index sampled with shuffle false or true:
-    # list(train_iter._index_sampler.sampler.__iter__())
-    #######################################################
-    test_dataset = Dataset_seq(df_test, target = args1.target, sequence_length = args1.sequence_length, forecast_all=args2.forecast_all,
-                                out_window = args1.out_window, prediction=args2.predict, transform=transform)
-    test_iter = DataLoader(dataset=test_dataset, batch_size=args1.batch_size, shuffle=False, num_workers=12)
-
-    if 'conv' not in args1.architecture:
-        if args1.scaled:
-            if not args1.shuffle:
-                torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-            else:
-                torch.save(train_iter, './dataloader/train_dataloader_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+    # TODO: make get param dict function
+    act_dict = {'relu': nn.ReLU(), 'elu': nn.ELU()}
+    cfg_dict = cfg.__dict__['_content']
+    param_conf = {}
+    for k1 in list(cfg_dict.keys()):
+        for k2 in list(cfg_dict[k1].keys()):
+            param_conf[k2] = cfg_dict[k1][k2]
+    try:
+        act = cfg.model.activation.lower()
+        param_conf['activation'] = act_dict[act]
+    except:
+        if 'lstm' in cfg.model.architecture:
+            pass
         else:
-            if not args1.shuffle:
-                torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}_{}.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-            else:
-                torch.save(train_iter, './dataloader/train_dataloader_not_scaled_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
-                torch.save(test_iter, './dataloader/test_dataloader_not_scaled_{}_ft_{}_{}_shuffle.pth'.format(len(args1.columns), args1.sampling_rate, args1.sequence_length))
+            print('attention, activation is not present in the model')
 
-    if args1.target != None:
-        n_features = len(args1.columns) - len(args1.target)
-    else:
-        n_features = len(args1.columns)
-        target = args1.columns
+    train_dataset = Dataset_seq(df_train, target =cfg.dataset.target, sequence_length = cfg.dataset.sequence_length,
+                                out_window = cfg.dataset.out_window, prediction=cfg.dataset.predict, forecast_all=cfg.dataset.forecast_all,
+                                transform=transform)
+    train_iter = DataLoader(dataset=train_dataset, batch_size=cfg.dataset.batch_size, shuffle=True, num_workers=12)
 
-    param_conf.update({'n_features':n_features,
-                       'output_size':len(target)})
+    test_dataset = Dataset_seq(df_test, target = cfg.dataset.target, sequence_length = cfg.dataset.sequence_length, forecast_all=cfg.dataset.forecast_all,
+                                out_window = cfg.dataset.out_window, prediction=cfg.dataset.predict, transform=transform)
+    test_iter = DataLoader(dataset=test_dataset, batch_size=cfg.dataset.batch_size, shuffle=False, num_workers=12)
 
-    checkpoint_path = os.path.join(args1.model_path, args1.architecture)
-
-    if args1.architecture == "lstm_ae":
-        model = LSTM_AE(seq_in=args1.sequence_length, seq_out= args1.out_window, n_features=n_features,
-                        output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        n_layers_1=args1.n_layers_1, n_layers_2=args1.n_layers_2, no_latent=args1.no_latent).to(device)
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-
-        train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
-              out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
-
-    if args1.architecture == "lstm":
-        model = LSTM(seq_in=args1.sequence_length, seq_out= args1.out_window, n_features=n_features,
-                        output_size=len(target), embedding_dim=args1.embedding_dim,
-                        n_layers_1=args1.n_layers_1, n_layers_2=args1.n_layers_2).to(device)
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-
-        train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
-              out_dir =checkpoint_path , model_name= args2.model_name, patience=args1.patience, epochs = args1.epochs)
-
-
-    elif args1.architecture == "lstm_vae":
-        model = LSTM_VAE(seq_in=args1.sequence_length, seq_out= args1.out_window, no_features=n_features,
-                        output_size=len(target), embedding_dim=args1.embedding_dim, latent_dim=args1.latent_dim,
-                        Nf_lognorm=n_features, Nf_binomial=args1.N_binomial, n_layers_1=args1.n_layers_1,
-                         n_layers_2=args1.n_layers_2, kld=args1.kld).to(device)
-        criterion = None
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-        train_lstm_vae(param_conf, n_features, train_iter, test_iter, model, criterion, optimizer, scheduler,
-                  device, out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs,
-                       Nf_lognorm=None, Nf_binomial=None, kld_factor = 1)
-
-    elif args1.architecture == "conv_ae":
-        model = CONV_AE(in_channel=1,  heigth=args1.sequence_length, width=len(args1.columns),
-                        kernel_size=args1.kernel_size, filter_num=args1.filter_num,
-                 latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation = args1.activation,
-                        increasing=args1.increasing, flattened=args1.flattened).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-        criterion = nn.MSELoss()
-
-        train_conv_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
-              out_dir =checkpoint_path , model_name= args2.model_name, epochs = args1.epochs)
-
-    elif args1.architecture == "conv_ae1D":
-        model = CONV_AE1D(in_channel=len(df_train.columns), length=args1.sequence_length,
-                          kernel_size=args1.kernel_size, filter_num=args1.filter_num, stride=args1.stride,pool=args1.pool,
-                          latent_dim=args1.latent_dim, n_layers=args1.n_layers, activation=args1.activation, bn=args1.bn
-                          ,increasing=args1.increasing, flattened=args1.flattened).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=args1.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
-        criterion = nn.MSELoss()
-        train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
-                        out_dir=checkpoint_path, model_name=args2.model_name, epochs=args1.epochs)
+    checkpoint_path = os.path.join(model_results, cfg.model.architecture)
+    start_train(cfg, param_conf, train_iter, test_iter, device, checkpoint_path, model_name)
 
 if __name__ == '__main__':
 
-    parser1 = argparse.ArgumentParser()
-    parser1.add_argument("--architecture", default='lstm', help="[lstm, lstm_ae, lstm_vae, conv_ae, conv_ae1D")
-    #dataset
-    parser1.add_argument("--columns", default=columns, help="columns imported from config, [columns, columns_third_wheel]")
-    parser1.add_argument("--model_path", default=model_results, help="where to save model")
-    parser1.add_argument("--train_val_split", default=0.80, help="a number to specify how many feats to take from columns")
-    parser1.add_argument('--shuffle', action='store_const', const=False, default=False, help='')
-    parser1.add_argument("--columns_subset", default=0, help="a number to specify how many feats to take from columns")
-    parser1.add_argument("--dataset_subset", default=100000, help="number of row to use from all the dataset")
-    parser1.add_argument("--batch_size", default=100, help="batch size")
-
-    parser1.add_argument("--epochs", default=50, help="ns")
-    parser1.add_argument("--patience", default=5, help="ns")
-    parser1.add_argument("--lr", default=0.0009, help="nus")
-    parser1.add_argument("--out_window", default=5, help="sequence lenght of the output")
-    parser1.add_argument("--sequence_length", default=40, help="sequence_length")
-
-    # conv architecture (1D and 2D)
-    parser1.add_argument("--n_layers", default=1, help="")
-    parser1.add_argument("--increasing", default=0, help="0 or 1")
-    parser1.add_argument("--stride", default=1, help="")
-    parser1.add_argument("--kernel_size", default=7, help="")
-    parser1.add_argument("--filter_num", default=110, help="")
-    parser1.add_argument("--activation", default=nn.ELU(), help="")
-    parser1.add_argument("--flattened", default=1, help="0 or 1")
-    # conv architecture (1D only)
-    parser1.add_argument("--pool", default=1, help="0 or 1")
-    parser1.add_argument("--bn", default=1, help="0 or 1")
-    # conv architecture (2D only)
-
-
-    # lstm architecture
-    parser1.add_argument("--embedding_dim", default=32, help="s")
-    parser1.add_argument("--n_layers_1", default=1, help="")
-    parser1.add_argument("--n_layers_2", default=1, help="")
-    parser1.add_argument("--no_latent",  action='store_const', const=False, default=False)
-    parser1.add_argument("--latent_dim", default=100, help="")
-
-    # lstm vae architecture only
-    parser1.add_argument("--N_binomial", default=1, help="number of epochs")
-    parser1.add_argument("--kld", default='vanilla', help="[vanilla, custom]")
-
-
-    # dataset
-    parser1.add_argument("--sampling_rate", type=str, default="4s", help="[2s, 4s]")
-    parser1.add_argument('--scaled', action='store_const', const=False, default=True,
-                        help='')
-    parser1.add_argument('--forecast_all', action='store_true',
-                        help='')
-    parser1.add_argument("--target", default=None, help="columns name of the target if none >>> autoencoder mode")
-    args1 = parser1.parse_args()
-
-
-    parser2 = argparse.ArgumentParser()
-    parser2.add_argument("--data_path", type=str, default=f'./data/FIORIRE/dataset_{args1.sampling_rate}/')
-    parser2.add_argument("--dataset", default=f'all_2016-2018_clean_std_{args1.sampling_rate}.pkl', help="ae")
-    parser2.add_argument('--predict', action='store_true', help='')
-    parser2.add_argument('--forecast', action='store_true', help='')
-    parser2.add_argument('--forecast_all', action='store_true', help='')
-
-    n_features = args1.columns_subset if args1.columns_subset != 0 else len(columns)
-
-    now = datetime.now()
-    print("now =", now)
-    # dd/mm/YY H:M:S
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-    dt_string = dt_string.replace('/', '_').replace(' ', '_')
-
-    if 'lstm' in args1.architecture:
-        parser2.add_argument("--model_name", default='{}_sl_{}_emb_{}_layers_{}_{}_{}'.format(args1.architecture,
-                                                                                           args1.sequence_length,
-                                                                                           args1.embedding_dim, args1.n_layers_1
-                                                                                           ,args1.n_layers_2, dt_string), help="ae")
-    else:
-        parser2.add_argument("--model_name", default='{}_sl_{}_filter_n_{}_kernel_size_{}_{}'.format(args1.architecture, args1.sequence_length,
-                                                                                   args1.filter_num, args1.kernel_size, dt_string), help="ae")
-
-    args2 = parser2.parse_args()
-
-    args1.out_window = args1.sequence_length
-
-    conf = OmegaConf.load('config.yaml')
-
-    main(args1, conf)
-
+    parser = argparse.ArgumentParser(description='Define parameters for crop.')
+    parser.add_argument('--config_name', nargs="?", default='lstm_vae',
+                        help='the folder including the images to crop')
+    args = parser.parse_args()
+    main(args)

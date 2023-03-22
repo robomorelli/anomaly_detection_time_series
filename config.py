@@ -8,7 +8,7 @@ root = [x if x not in paths_to_exclude else '' for x in root_parts]
 root = '/'.join(root)
 model_results = os.path.join(root, 'model_results/')
 esa_exploration = os.path.join(model_results, 'esa_exploration/')
-data_path = os.path.join(root, 'data/')
+data_path = os.path.join(root, 'data/FIORIRE/')
 
 
 columns = ['RW1_motcurr', 'RW2_motcurr', 'RW3_motcurr', 'RW4_motcurr',  'RW1_cmd_volt', 'RW2_cmd_volt',

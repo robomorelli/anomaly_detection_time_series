@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch
 from tqdm import tqdm
-from models.utils import EarlyStopping
+from utils.opt import EarlyStopping
 torch.manual_seed(0)
 
 ####################
@@ -83,7 +83,7 @@ class LSTM(nn.Module):
 
 
 def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
-                  device,out_dir, model_name,patience=10, epochs=100):
+                  device,out_dir, model_name, epochs=100, es_patience=10):
     """
     Training function.
     Args:
@@ -95,7 +95,7 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
         config:
     """
 
-    early_stopping = EarlyStopping(patience=patience)
+    early_stopping = EarlyStopping(patience=es_patience)
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
@@ -137,7 +137,7 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
                 val_steps += 1
 
             temp_val_loss= temp_val_loss / val_steps
-            scheduler.step()
+            scheduler.step(temp_val_loss)
             print('eval loss {}'.format(temp_val_loss))
 
             early_stopping(temp_val_loss)

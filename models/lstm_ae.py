@@ -1,18 +1,11 @@
 import os
-import torch
 import torch.nn as nn
-# from .early_stopping import *
-from json import dump
 import torch
 from tqdm import tqdm
+from utils.opt import EarlyStopping
 torch.manual_seed(0)
 
 
-####################
-# LSTM Autoencoder #
-####################
-# code inspired by  https://github.com/shobrook/sequitur/blob/master/sequitur/autoencoders/rae.py
-# annotation sourced by  https://pytorch.org/docs/stable/nn.html#torch.nn.LSTM
 class Encoder(nn.Module):
     def __init__(self, seq_in, n_features, embedding_size, latent_dim, n_layers_1=2, n_layers_2=1, no_latent=False):
         super().__init__()
@@ -176,7 +169,7 @@ class LSTM_AE(nn.Module):
 
 def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
                   device,
-           out_dir, model_name, epochs=100):
+           out_dir, model_name, epochs=100, es_patience=10):
     """
     Training function.
     Args:
@@ -191,6 +184,7 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    early_stopping = EarlyStopping(patience=es_patience)
 
     val_loss = 10 ** 16
     for epoch in tqdm(range(epochs), unit='epoch'):
@@ -230,8 +224,13 @@ def train_lstm_ae(param_conf, train_iter, test_iter, model, criterion, optimizer
                 val_steps += 1
 
             temp_val_loss= temp_val_loss / val_steps
-            scheduler.step()
+            scheduler.step(temp_val_loss)
             print('eval loss {}'.format(temp_val_loss))
+
+            early_stopping(temp_val_loss)
+            if early_stopping.early_stop:
+                break
+
             if temp_val_loss < val_loss:
                 print('val_loss improved from {} to {}, saving model  {} to {}' \
                       .format(val_loss, temp_val_loss, model_name, out_dir))
