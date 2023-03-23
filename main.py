@@ -20,7 +20,7 @@ def load_object(dct):
 #@click.option('-c', '--config-name', type=click.Path())
 def main(config_name):
 
-    cfg = OmegaConf.load('configuration/{}.yaml'.format(args.config_name))
+    cfg = OmegaConf.load(os.path.join(conf_path, '{}.yaml'.format(args.config_name)))
     cfg.dataset.out_window = cfg.dataset.sequence_length
     cfg.dataset.data_path = os.path.join(data_path, 'dataset_{}'.format(cfg.dataset.sampling_rate))
 
