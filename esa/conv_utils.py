@@ -14,7 +14,7 @@ from config import *
 def moving_average(x, w):
     return np.convolve(x, np.ones(w), 'same') / w
 
-def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=None, arch='conv_ae2D'):
+def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=None, arch='conv_ae'):
     
     if shift==None:
         shift = np.random.randint(len(test_iter.dataset.df_data)-100)
@@ -27,7 +27,7 @@ def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=No
         .values
     
     x = torch.from_numpy(x).float()
-    if arch=='conv_ae2D':
+    if arch=='conv_ae':
         x = torch.unsqueeze(x, 1)
     elif arch=='conv_ae1D':
         x = torch.squeeze(x, 1)
