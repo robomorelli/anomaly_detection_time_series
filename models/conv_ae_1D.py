@@ -1,9 +1,10 @@
 import os
 import torch.nn as nn
-from models.utils import conv_block1D, deconv_block1D
 import torch
 import numpy as np
 from tqdm import tqdm
+import sys
+sys.path.append('..')
 from utils.opt import EarlyStopping
 from utils.layers import conv_block1D, deconv_block1D
 

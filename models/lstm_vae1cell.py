@@ -2,6 +2,8 @@ import os
 import torch.nn as nn
 import torch
 from tqdm import tqdm
+import sys
+sys.path.append('..')
 from utils.opt import EarlyStopping
 from utils.layers import InverseSquareRootLinearUnit, ClippedTanh, ClippedTanh0
 from utils.losses import KL_loss, KL_loss_forVAE_custom, loss_function

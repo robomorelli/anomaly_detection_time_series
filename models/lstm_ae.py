@@ -2,6 +2,8 @@ import os
 import torch.nn as nn
 import torch
 from tqdm import tqdm
+import sys
+sys.path.append('..')
 from utils.opt import EarlyStopping
 torch.manual_seed(0)
 
