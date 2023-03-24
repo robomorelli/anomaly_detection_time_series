@@ -1,0 +1,21 @@
+exp_name;architecture;seq len;val loss;num params;trial_num;total trial num
+4_wheel_system_01-24-23:12:00:52_extended_params_sl_16;lstm ae;16;0.007;153912;20
+4_wheel_system_02-23-23:10:26:44_lstm_ae_sl_30_run1;lstm ae;30;0.0087;302476;1
+4_wheel_system_01-24-23:13:40:52_extended_params_sl_100; lstm ae;100;0.033;160352;19
+third_wheel_01-27-23:09:16:52_lstm_extended_params_sl_30_run_1;lstm ae;30;0.0019;239124;39
+third_wheel_01-27-23:09:49:21_lstm_extended_params_sl_30_run_1;lstm ae;30;0.0029;153280;8
+third_wheel_01-24-23:11:20:34_extended_params_sl_100;lstm ae;100;0.0144;150060;11
+4_wheel_system_03-18-23:11:15:48_conv_ae1D_sl_40_run_2;conv 1D;40;0.0001;101540;33
+4_wheel_system_03-17-23:13:12:45_conv_ae1D_sl_16;conv 1D;16;0.0001;34070;19
+4_wheels_system_03-18-23:11:07:08_conv_ae1D_sl_40_flattened_increasing_less_par; conv 1D;40;0.0006;463728;12
+third_wheel_02-24-23:14:37:37_conv_ae1D_sl_16;conv 1D;16;0.00011;5786;32
+third_wheel_02-26-23:09:37:14_conv_ae1D_sl_40;conv 1D;40;0.00012;5786;21
+4_wheel_system_02-23-23:21:48:40_conv_ae_sl_16;conv 2D;16;0.002;158705;22
+4_wheel_system_02-25-23:16:15:02_conv_ae_sl_40;conv 2D;40;0.0056;285321;29
+4_wheel_system_02-25-23:16:15:02_conv_ae_sl_40;conv 2D;40;0.0066;189805;16
+4_wheel_system_02-24-23:14:02:26_lstm_sl_16;lstm;16;0.07;8132;37
+4_wheel_system_01-29-23:16:20:16_lstm_forecast_sl_30_run_2;lstm;30;0.09;51536;5
+third_wheel_01-30-23:09:50:12_lstm_forecast_sl_16_run_1;lstm;16;0.07;30596;9
+
+
+
