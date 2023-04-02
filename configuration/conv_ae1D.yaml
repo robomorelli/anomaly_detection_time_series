@@ -9,7 +9,7 @@ dataset:
   train_val_split: 0.70
   shuffle: 0
   columns_subset: 0
-  dataset_subset: 1000000   #subset of rows to select from the original atabases
+  dataset_subset: 10000000   #subset of rows to select from the original atabases
   batch_size: 500
   sampling_rate: '4s'
   scaled: 1   # standardize the data values

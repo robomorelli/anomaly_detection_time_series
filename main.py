@@ -1,7 +1,7 @@
 import torch.nn as nn
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SubsetRandomSampler
 from dataset.sentinel import *
 from config import *
 import argparse
@@ -10,6 +10,7 @@ from omegaconf import DictConfig
 import click
 import yaml
 import json
+import numpy as np
 import types
 from utils.training import start_train, dataset_preprocessing, dataset_split, get_name, get_transform
 
@@ -40,10 +41,10 @@ def main(config_name):
 
     dataset_path = os.path.join(cfg.dataset.data_path, cfg.dataset.name)
     df_processed = dataset_preprocessing(dataset_path, cfg, scaler)
-    X_train, X_test, y_train, y_test = dataset_split(df_processed, cfg)
 
-    df_train = pd.DataFrame(X_train, columns=cfg.dataset.columns)
-    df_test = pd.DataFrame(X_test, columns=cfg.dataset.columns)
+    #X_train, X_test, y_train, y_test = dataset_split(df_processed, cfg)
+    #df_train = pd.DataFrame(X_train, columns=cfg.dataset.columns)
+    #df_test = pd.DataFrame(X_test, columns=cfg.dataset.columns)
 
     if cfg.dataset.target != None:
         cfg.dataset.n_features = len(cfg.dataset.columns) - len(cfg.dataset.target)
@@ -70,6 +71,29 @@ def main(config_name):
         else:
             print('attention, activation is not present in the model')
 
+    np.random.seed(101)  # Here, 101 is seed value
+
+    dataset_size = len(df_processed)
+    idxs = np.arange(0, dataset_size, cfg.dataset.sequence_length)
+    np.random.shuffle(idxs)
+    #array([933952, 843728,  70352, ..., 283920, 286896, 734704])
+
+    train_split_index = int(np.floor(cfg.dataset.train_val_split * len(idxs)))
+    train_idx, val_idx = idxs[:train_split_index], idxs[train_split_index:]
+
+    train_sampler = SubsetRandomSampler(train_idx)
+    val_sampler = SubsetRandomSampler(val_idx)
+
+    train_dataset = Dataset_seq(df_processed, target =cfg.dataset.target, sequence_length = cfg.dataset.sequence_length,
+                                out_window = cfg.dataset.out_window, prediction=cfg.dataset.predict, forecast_all=cfg.dataset.forecast_all,
+                                transform=transform)
+    train_iter = DataLoader(dataset=train_dataset, batch_size=cfg.dataset.batch_size, num_workers=12, sampler=train_sampler)
+
+    test_dataset = Dataset_seq(df_processed, target = cfg.dataset.target, sequence_length = cfg.dataset.sequence_length, forecast_all=cfg.dataset.forecast_all,
+                                out_window = cfg.dataset.out_window, prediction=cfg.dataset.predict, transform=transform)
+    test_iter = DataLoader(dataset=test_dataset, batch_size=cfg.dataset.batch_size, num_workers=12, sampler=val_sampler)
+
+    ''' 
     train_dataset = Dataset_seq(df_train, target =cfg.dataset.target, sequence_length = cfg.dataset.sequence_length,
                                 out_window = cfg.dataset.out_window, prediction=cfg.dataset.predict, forecast_all=cfg.dataset.forecast_all,
                                 transform=transform)
@@ -78,6 +102,7 @@ def main(config_name):
     test_dataset = Dataset_seq(df_test, target = cfg.dataset.target, sequence_length = cfg.dataset.sequence_length, forecast_all=cfg.dataset.forecast_all,
                                 out_window = cfg.dataset.out_window, prediction=cfg.dataset.predict, transform=transform)
     test_iter = DataLoader(dataset=test_dataset, batch_size=cfg.dataset.batch_size, shuffle=False, num_workers=12)
+    '''
 
     checkpoint_path = os.path.join(model_results, cfg.model.architecture)
     start_train(cfg, param_conf, train_iter, test_iter, device, checkpoint_path, model_name)
@@ -85,7 +110,7 @@ def main(config_name):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Define parameters for crop.')
-    parser.add_argument('--config_name', nargs="?", default='lstm_vae',
+    parser.add_argument('--config_name', nargs="?", default='conv_ae1D',
                         help='the folder including the images to crop')
     args = parser.parse_args()
     main(args)
