@@ -17,7 +17,7 @@ def load_object(dct):
     return types.SimpleNamespace(**dct)
 
 #@click.command()
-#@click.option('-c', '--config-name', type=click.Path())
+#@click.option('-c', '---name', type=click.Path())
 def main(config_name):
 
     cfg = OmegaConf.load(os.path.join(conf_path, '{}.yaml'.format(args.config_name)))

@@ -158,7 +158,7 @@ class CONV_AE1D(nn.Module):
         if self.increasing:
             self.filter_num_list = [int(self.filter_num * ((ix + 1) * 2)) for ix in range(self.n_layers)]
         else:
-            self.filter_num_list = [int(self.filter_num / ((ix + 1)*2)) for ix in range(self.n_layers)]
+            self.filter_num_list = [int(self.filter_num / ((ix + 1) * 2)) for ix in range(self.n_layers)]
 
         self.filter_num_list = [self.in_channel] + [self.filter_num] + self.filter_num_list
 
