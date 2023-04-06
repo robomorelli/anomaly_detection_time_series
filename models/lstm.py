@@ -6,6 +6,7 @@ from tqdm import tqdm
 import sys
 sys.path.append('..')
 from utils.opt import EarlyStopping
+import matplotlib.pyplot as plt
 torch.manual_seed(0)
 
 ####################
@@ -103,6 +104,8 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
         os.makedirs(out_dir)
 
     val_loss = 10 ** 16
+    val_losses = []
+    train_losses = []
     for epoch in tqdm(range(epochs), unit='epoch'):
         train_loss = 0.0
         train_steps = 0
@@ -126,6 +129,7 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
                 print(loss.item())
 
         print('train loss at the end of epoch is ', train_loss/train_steps)
+        train_losses.append(train_loss/train_steps)
 
         model.eval()
         val_steps = 0
@@ -141,6 +145,21 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
             temp_val_loss= temp_val_loss / val_steps
             scheduler.step(temp_val_loss)
             print('eval loss {}'.format(temp_val_loss))
+            
+            val_losses.append(temp_val_loss)       
+            epochs = [x for x in range(len(train_losses))]
+            
+      
+            fig = plt.figure(figsize=(4,3))
+
+            plt.plot(epochs, train_losses, marker='.',label = "train mse loss")
+            plt.plot(epochs, val_losses,marker='.', label = "val mse loss")
+            plt.xlabel('epochs', fontsize=18)
+            plt.ylabel('mse value', fontsize=18)
+            plt.yticks(fontsize=16)
+            plt.xticks(fontsize=16)
+            plt.legend(fontsize=14)
+            plt.show()
 
             early_stopping(temp_val_loss)
             if early_stopping.early_stop:

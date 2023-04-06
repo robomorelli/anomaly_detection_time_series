@@ -2,6 +2,7 @@ import os
 import torch.nn as nn
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 import sys
 sys.path.append('..')
@@ -197,6 +198,8 @@ def train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimiz
     early_stopping = EarlyStopping(patience=es_patience)
 
     val_loss = 10 ** 16
+    val_losses = []
+    train_losses = []
     for epoch in tqdm(range(epochs), unit='epoch'):
         print('epoch', epoch)
         train_loss = 0.0
@@ -220,6 +223,7 @@ def train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimiz
                 print(loss.item())
 
         print('train loss at the end of epoch is ', train_loss/train_steps)
+        train_losses.append(train_loss/train_steps)
 
         model.eval()
         val_steps = 0
@@ -232,13 +236,31 @@ def train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimiz
                 temp_val_loss += loss
                 val_steps += 1
 
+
+            temp_val_loss= temp_val_loss / val_steps
+            
             early_stopping(temp_val_loss)
             if early_stopping.early_stop:
                 break
-
-            temp_val_loss= temp_val_loss / val_steps
             print('eval loss {}'.format(temp_val_loss))
+            
             scheduler.step(temp_val_loss)
+            val_losses.append(temp_val_loss)       
+            epochs = [x for x in range(len(train_losses))]
+            
+      
+            fig = plt.figure(figsize=(4,3))
+
+            plt.plot(epochs, train_losses, marker='.',label = "train mse loss")
+            plt.plot(epochs, val_losses,marker='.', label = "val mse loss")
+            plt.xlabel('epochs', fontsize=18)
+            plt.ylabel('mse value', fontsize=18)
+            plt.yticks(fontsize=16)
+            plt.xticks(fontsize=16)
+            plt.legend(fontsize=14)
+            plt.show()
+            
+            
             if temp_val_loss < val_loss:
                 print('val_loss improved from {} to {}, saving model  {} to {}' \
                       .format(val_loss, temp_val_loss, model_name, out_dir))

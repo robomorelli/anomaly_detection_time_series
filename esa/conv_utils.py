@@ -37,7 +37,7 @@ def unrolling_batches_conv(num_batch, test_iter, sequence_length, cols, shift=No
 
 def read_dataset_conv(dataset_name, scaled,columns_subset, dataset_subset, cols, 
                  train_val_split, sequence_length, out_window,  predict=False,
-                 batch_size=4, transform=None):
+                 batch_size=4, transform=None, test=False):
     
     target=None
     xdf = pd.read_pickle(dataset_name)
@@ -46,40 +46,89 @@ def read_dataset_conv(dataset_name, scaled,columns_subset, dataset_subset, cols,
         cols = cols[:columns_subset]
     dataRaw = xdf[cols].dropna()
 
-    if dataset_subset:
+    if dataset_subset and not test:
+        
         dataRaw = dataRaw.iloc[:dataset_subset, :]
+        
+        dfTrainVal = dataRaw .copy()
+        xTrainVal = dfTrainVal.values
+        
+        if scaled:
+            scaler = StandardScaler()
+            x_train_val_scaled = scaler.fit_transform(xTrainVal)
+            dfNorm = pd.DataFrame(x_train_val_scaled, columns=dataRaw.columns)
 
-    df = dataRaw.copy()
-    x = df.values
+        else:
+            df_train_val = pd.DataFrame(xTrainVal, columns=df.columns)
+            dfNorm = pd.DataFrame(xTrainVal, columns=dataRaw.columns)
+  
+        X_train, X_test, y_train, y_test = train_test_split(dfNorm, dfNorm, \
+                                                            train_size=train_val_split\
+                                                            , shuffle=False)
 
-    if scaled:
-        scaler = StandardScaler()
-        x_scaled = scaler.fit_transform(x)
-        dfNorm = pd.DataFrame(x_scaled, columns=df.columns)
-    else:
-        dfNorm = pd.DataFrame(x, columns=df.columns)
+        df_train = pd.DataFrame(X_train, columns=dfNorm.columns)
+        df_test = pd.DataFrame(X_test, columns=dfNorm.columns)
 
-    X_train, X_test, y_train, y_test = train_test_split(dfNorm, dfNorm, \
-                                                        train_size=train_val_split\
-                                                        , shuffle=False)
-    df_train = pd.DataFrame(X_train, columns=dfNorm.columns)
-    df_test = pd.DataFrame(X_test, columns=dfNorm.columns)
 
-    
+        train_dataset = Dataset_seq(df_train, target = target, sequence_length = sequence_length,
+                                    out_window = out_window, prediction=predict,\
+                                    transform=transform)
+        train_iter = DataLoader(dataset=train_dataset,\
+                                batch_size=batch_size, shuffle=False)
 
-    train_dataset = Dataset_seq(df_train, target = target, sequence_length = sequence_length,
-                                out_window = out_window, prediction=predict,\
-                                transform=transform)
-    train_iter = DataLoader(dataset=train_dataset,\
-                            batch_size=batch_size, shuffle=True)
+        test_dataset = Dataset_seq(df_test, target = target, \
+                                   sequence_length = sequence_length,
+                                    out_window = out_window, prediction=predict,\
+                                   transform=transform)
+        test_iter = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+        test_iter_loss = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+        
+        return df_train, df_test, train_iter, test_iter, test_iter_loss
+        
+        
+    elif dataset_subset and test:
+        dataRawTest = dataRaw.iloc[dataset_subset:, :]
+        dataRawTrainVal = dataRaw.iloc[:dataset_subset, :]
 
-    test_dataset = Dataset_seq(df_test, target = target, \
-                               sequence_length = sequence_length,
-                                out_window = out_window, prediction=predict,\
-                               transform=transform)
-    test_iter = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+        dfTrainVal = dataRawTrainVal.copy()
+        xTrainVal = dfTrainVal.values
 
-    return df_train, df_test, train_iter, test_iter
+        dfTest = dataRawTest.copy()
+        x_unscaled_test = dfTest.values
+
+        if scaled:
+            scaler = StandardScaler()
+            x_train_val_scaled = scaler.fit_transform(xTrainVal)
+            x_test = scaler.fit_transform(x_unscaled_test)
+            df_train_val = pd.DataFrame(x_train_val_scaled, columns=dataRaw.columns)
+            df_test = pd.DataFrame(x_test, columns=dataRaw.columns)
+
+        else:
+            df_test = pd.DataFrame(x_unscaled_test, columns=dataRaw.columns)
+            df_train_val = pd.DataFrame(xTrainVal, columns=dataRaw.columns)
+
+
+        train_dataset = Dataset_seq(df_train_val, target = target, sequence_length = sequence_length,
+                                    out_window = out_window, prediction=predict,\
+                                    transform=transform)
+        train_iter = DataLoader(dataset=train_dataset,\
+                                batch_size=batch_size, shuffle=False)
+
+        test_dataset = Dataset_seq(df_test, target = target, \
+                                   sequence_length = sequence_length,
+                                    out_window = out_window, prediction=predict,\
+                                   transform=transform)
+        test_iter = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+        test_iter_loss = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+        
+        #dataset_size = len(df_test)
+        #idxs = np.arange(0, dataset_size, sequence_length)
+        
+        #test_sampler = SubsetRandomSampler(idxs)
+        
+        #test_iter_loss = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, sampler=test_sampler)
+
+        return df_train_val, df_test, train_iter, test_iter, test_iter_loss
 
 
 
