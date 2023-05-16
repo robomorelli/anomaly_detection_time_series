@@ -1,8 +1,9 @@
 # Dataset
 dataset:
   name: 'all_2016-2018_clean_std_4s.pkl'
-  sequence_length: 16
+  sequence_length: 20
   perc_overlap: 1
+  out_window: 10
   columns: ['RW1_motcurr', 'RW2_motcurr', 'RW3_motcurr', 'RW4_motcurr',
             'RW1_cmd_volt', 'RW2_cmd_volt','RW3_cmd_volt', 'RW4_cmd_volt',
             'RW1_therm','RW2_therm', 'RW3_therm', 'RW4_therm',
@@ -21,15 +22,14 @@ dataset:
 
 opt:
   epochs: 200
-  lr: 0.001
+  lr: 0.0001
   lr_patience: 5 # learning rate patience
   es_patience: 10 #early stopping patience
 
 model:
-  architecture: 'lstm'
-  embedding_dim: 64 #hidden size of the second and last encoding LSTM cell (the first cell has a doubled hidden size)
-  latent_dim: 100 # latent space dim
-  n_layers_1: 1 #number of layer of the first lstm cell
-  n_layers_2: 1 #number of layer of the second lstm cell
+  architecture: 'enc_dec_lstm'
+  hidden_size: 64 #hidden size of the second and last encoding LSTM cell (the first cell has a doubled hidden size)
+  n_layers: 2
+  n_cells: 1
 
 

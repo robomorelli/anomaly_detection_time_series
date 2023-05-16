@@ -248,7 +248,7 @@ def train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimiz
             val_losses.append(temp_val_loss)       
             epochs = [x for x in range(len(train_losses))]
             
-      
+            ''' 
             fig = plt.figure(figsize=(4,3))
 
             plt.plot(epochs, train_losses, marker='.',label = "train mse loss")
@@ -259,6 +259,7 @@ def train_conv_ae1D(param_conf, train_iter, test_iter, model, criterion, optimiz
             plt.xticks(fontsize=16)
             plt.legend(fontsize=14)
             plt.show()
+            '''
             
             
             if temp_val_loss < val_loss:

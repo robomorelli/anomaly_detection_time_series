@@ -1,6 +1,6 @@
-from colorama import init as colorama_init
-from colorama import Fore
-from colorama import Style
+#from colorama import init as colorama_init
+#from colorama import Fore
+#from colorama import Style
 
 W  = '\033[0m'  # white (normal)
 R  = '\033[31m' # red

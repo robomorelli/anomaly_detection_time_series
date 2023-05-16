@@ -6,7 +6,7 @@ from dataset.sentinel import *
 from config import *
 import argparse
 from omegaconf import OmegaConf
-from omegaconf import DictConfig
+#from omegaconf import DictConfig
 import click
 import yaml
 import json
@@ -22,7 +22,11 @@ def load_object(dct):
 def main(config_name):
 
     cfg = OmegaConf.load(os.path.join(conf_path, '{}.yaml'.format(args.config_name)))
-    cfg.dataset.out_window = cfg.dataset.sequence_length
+    if "out_window" in cfg.dataset.keys():
+        out_window = cfg.dataset.out_window
+    else:
+        cfg.dataset.out_window = cfg.dataset.sequence_length
+
     cfg.dataset.data_path = os.path.join(data_path, 'dataset_{}'.format(cfg.dataset.sampling_rate))
 
     model_name = get_name(cfg)
@@ -31,6 +35,7 @@ def main(config_name):
     try:
         sm = str(torch.cuda.get_device_capability())
         sm = ''.join((sm.strip('()').split(',')[0], sm.strip('()').split(',')[1])).replace(' ', '')
+        sm = 'sm_' + sm
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda:0" if use_cuda and sm in torch.cuda.get_arch_list() else "cpu")
     except:
@@ -71,12 +76,24 @@ def main(config_name):
     np.random.seed(101)  # Here, 101 is seed value
     
     print(param_conf)
-    
-     
 
     dataset_size = len(df_processed)
-    idxs = np.arange(0, dataset_size, cfg.dataset.sequence_length)
-    np.random.shuffle(idxs)
+
+    ############ New ############
+    if "perc_overlap" in cfg.dataset.keys():
+        perc_overlap = cfg.dataset.perc_overlap
+    else:
+        cfg.dataset.perc_overlap=1
+
+    step = cfg.dataset.sequence_length-int(cfg.dataset.sequence_length*cfg.dataset.perc_overlap)
+    if step == 0:
+        step = 1
+
+    idxs = np.arange(0, dataset_size, step)
+    ############ New ############
+
+    if cfg.dataset.shuffle: #change in dataset split the option of shuffle
+        np.random.shuffle(idxs)
 
     train_split_index = int(np.floor(cfg.dataset.train_val_split * len(idxs)))
     train_idx, val_idx = idxs[:train_split_index], idxs[train_split_index:]
@@ -122,7 +139,7 @@ def main(config_name):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Define parameters for crop.')
-    parser.add_argument('--config_name', nargs="?", default='conv_ae1D',
+    parser.add_argument('--config_name', nargs="?", default='lstm_ae',
                         help='the folder including the images to crop')
     args = parser.parse_args()
     main(args)

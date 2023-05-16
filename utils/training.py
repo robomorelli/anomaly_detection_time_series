@@ -1,5 +1,6 @@
 from models.lstm_ae import *
 from models.lstm import *
+from models.enc_dec_lstm import *
 from models.lstm_vae1cell import *
 from models.lstm_vae import *
 from models.conv_ae import *
@@ -29,12 +30,18 @@ def get_name(cfg):
                                                                                      cfg.model.embedding_dim,
                                                                                      cfg.model.n_layers_1, cfg.model.n_layers_2,
                                                                                      cfg.model.recon_loss, dt_string)
+        elif 'enc_dec' in cfg.model.architecture:
+            model_name = '{}_sl_{}_hs_{}_n_cells_{}_layers_{}_out_w_{}_{}'.format(cfg.model.architecture,
+                                                                                cfg.dataset.sequence_length,
+                                                                                cfg.model.hidden_size,
+                                                                                cfg.model.n_cells,
+                                                                                cfg.model.n_layers, cfg.dataset.out_window, dt_string)
         else:
-            model_name = '{}_sl_{}_emb_{}_layers_{}_{}_{}'.format(cfg.model.architecture,
+            model_name = '{}_sl_{}_emb_{}_layers_{}_{}_out_w_{}_{}'.format(cfg.model.architecture,
                                                                                 cfg.dataset.sequence_length,
                                                                                 cfg.model.embedding_dim,
                                                                                 cfg.model.n_layers_1,
-                                                                                cfg.model.n_layers_2, dt_string)
+                                                                                cfg.model.n_layers_2, cfg.dataset.out_window, dt_string)
     else:
         model_name = '{}_sl_{}_filter_n_{}_kernel_size_{}_{}'.format(cfg.model.architecture,
                                                                      cfg.dataset.sequence_length,
@@ -81,12 +88,7 @@ def dataset_preprocessing(dataset_path, cfg, scaler=None):
 
 def dataset_split(df, cfg):
 
-    if cfg.dataset.shuffle:
-        X_train, X_test, y_train, y_test = train_test_split(df, df, train_size=cfg.dataset.train_val_split,
-                                                            shuffle=True,
-                                                            random_state=123)
-    else:
-        X_train, X_test, y_train, y_test = train_test_split(df, df, train_size=cfg.dataset.train_val_split,
+    X_train, X_test, y_train, y_test = train_test_split(df, df, train_size=cfg.dataset.train_val_split,
                                                             shuffle=False)
     return X_train, X_test, y_train, y_test
 
@@ -118,6 +120,21 @@ def start_train(cfg, param_conf, train_iter, test_iter, device, checkpoint_path,
                                                                verbose=True)
 
         train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
+              out_dir =checkpoint_path , model_name= model_name, epochs = cfg.opt.epochs, es_patience=cfg.opt.es_patience)
+
+    if cfg.model.architecture == "enc_dec_lstm":
+
+        model = ENC_DEC_LSTM(seq_in=cfg.dataset.sequence_length, seq_out= cfg.dataset.out_window, input_size=len(cfg.dataset.columns),
+                        hidden_size=cfg.model.hidden_size,
+                        n_layers=cfg.model.n_layers, n_cells=cfg.model.n_cells).to(device)
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.opt.lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=cfg.opt.lr_patience,
+                                                               threshold=0.0001,
+                                                               threshold_mode='rel', cooldown=0, min_lr=9e-8,
+                                                               verbose=True)
+
+        train_enc_dec_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler, device,
               out_dir =checkpoint_path , model_name= model_name, epochs = cfg.opt.epochs, es_patience=cfg.opt.es_patience)
 
     elif cfg.model.architecture == "lstm_vae1cell":

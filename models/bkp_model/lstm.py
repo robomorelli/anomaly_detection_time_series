@@ -4,10 +4,13 @@ import torch.nn as nn
 import torch
 from tqdm import tqdm
 import sys
-sys.path.append('..')
+
+sys.path.append('../..')
 from utils.opt import EarlyStopping
 import matplotlib.pyplot as plt
+
 torch.manual_seed(0)
+
 
 ####################
 # LSTM Autoencoder #
@@ -45,6 +48,7 @@ class Encoder(nn.Module):
         self.apply(self.weight_init)
 
         print(self)
+
     @staticmethod
     def weight_init(m):
         if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):
@@ -56,15 +60,16 @@ class Encoder(nn.Module):
         # x is the output and so the size is > (batch, seq_len, hidden_size)
         # x, (_,_) = self.LSTM1(x)
         x, (hidden_state, cell_state) = self.LSTMenc(x)
-        x, (hidden_state, cell_state) = self.LSTM1(x) ### to switch to x because it needs repeated sequence
+        x, (hidden_state, cell_state) = self.LSTM1(x)  ### to switch to x because it needs repeated sequence
         #  ht[:,0,:] == x[0, -1, :] (or also x[0,-1,:]==hidden_state[-1,0,:]) with x ([32, 10, 64]) and h_state ([1, 32, 64])
-        #last_lstm_layer_hidden_state = hidden_state[-1, :, :] #take only the last layer
-        #we need hidden state only here because is like our encoding of the time series
-        out = self.out(x)
-        return out
+        ht = hidden_state[-1, :, -1] #take only the last layer
+        # we need hidden state only here because is like our encoding of the time series
+        out = self.out(x[:, -1, :]) #x[:,-1,:] all batches, last time step and all features
+        return out, ht
+
 
 class LSTM(nn.Module):
-    def __init__(self, seq_in = 7, seq_out= 7, n_features = 8, output_size=16,
+    def __init__(self, seq_in=7, seq_out=7, n_features=8, output_size=16,
                  embedding_dim=64, n_layers_1=2, n_layers_2=2):
         super().__init__()
 
@@ -76,17 +81,28 @@ class LSTM(nn.Module):
         self.n_layers_1 = n_layers_1
         self.n_layers_2 = n_layers_2
 
-        self.encoder = Encoder(self.seq_in, self.seq_out, self.n_features,self.output_size,
+        self.encoder = Encoder(self.seq_in, self.seq_out, self.n_features, self.output_size,
                                self.embedding_dim, self.n_layers_1, self.n_layers_2)
 
     def forward(self, x):
-        torch.manual_seed(0)
+
         y = self.encoder(x)
         return y
 
+    def predict(self, x):
+        prediction = []
+
+        for t in range(self.seq_out):
+            y = self.encoder(x)
+            prediction.append(y)
+
+            x = torch.cat((x[0, 1:,:], y), 1)
+
+        return prediction
+
 
 def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, scheduler,
-                  device,out_dir, model_name, epochs=100, es_patience=10):
+               device, out_dir, model_name, epochs=100, es_patience=10):
     """
     Training function.
     Args:
@@ -114,7 +130,7 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
             optimizer.zero_grad()
 
             # y.requires_grad_(True)
-            out = model(batch[0].to(device))
+            out, ht = model(batch[0].to(device))
             loss = criterion(out.to(device), batch[1].to(device))
             loss.backward()
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
@@ -128,38 +144,25 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
                 print("Loss:")
                 print(loss.item())
 
-        print('train loss at the end of epoch is ', train_loss/train_steps)
-        train_losses.append(train_loss/train_steps)
+        print('train loss at the end of epoch is ', train_loss / train_steps)
+        train_losses.append(train_loss / train_steps)
 
         model.eval()
         val_steps = 0
         temp_val_loss = 0
         with torch.no_grad():
             for i, batch in tqdm(enumerate(test_iter), total=len(test_iter), desc="Evaluating"):
-
-                out = model(batch[0].to(device))
+                out, ht = model(batch[0].to(device))
                 loss = criterion(out.to(device), batch[1].to(device)).item()
                 temp_val_loss += loss
                 val_steps += 1
 
-            temp_val_loss= temp_val_loss / val_steps
+            temp_val_loss = temp_val_loss / val_steps
             scheduler.step(temp_val_loss)
             print('eval loss {}'.format(temp_val_loss))
-            
-            val_losses.append(temp_val_loss)       
-            epochs = [x for x in range(len(train_losses))]
-            
-      
-            fig = plt.figure(figsize=(4,3))
 
-            plt.plot(epochs, train_losses, marker='.',label = "train mse loss")
-            plt.plot(epochs, val_losses,marker='.', label = "val mse loss")
-            plt.xlabel('epochs', fontsize=18)
-            plt.ylabel('mse value', fontsize=18)
-            plt.yticks(fontsize=16)
-            plt.xticks(fontsize=16)
-            plt.legend(fontsize=14)
-            plt.show()
+            val_losses.append(temp_val_loss)
+            epochs = [x for x in range(len(train_losses))]
 
             early_stopping(temp_val_loss)
             if early_stopping.early_stop:
@@ -174,5 +177,5 @@ def train_lstm(param_conf, train_iter, test_iter, model, criterion, optimizer, s
                     'optimizer_state_dict': optimizer.state_dict(),
                     'param_conf': param_conf,
                 }, out_dir + '/{}.pth'.format(model_name))
-                #torch.save(model, out_dir + '{}.pth'.format(model_name))
+                # torch.save(model, out_dir + '{}.pth'.format(model_name))
                 val_loss = temp_val_loss

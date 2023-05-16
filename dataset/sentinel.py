@@ -14,6 +14,10 @@ class Dataset_seq(Dataset):
         self.forecast = forecast
         self.forecast_all = forecast_all
         self.transform = transform
+
+        self.sequence_length = sequence_length
+        self.out_window = out_window
+
         #TODO raise error if prediction == true but target is not defined
         if self.prediction and not self.forecast:
             self.df_data = df.drop(target, axis=1)
@@ -21,15 +25,16 @@ class Dataset_seq(Dataset):
         elif self.forecast:
             self.df_data = df
             self.targets = df[target]
+            #self.out_window = 1
         elif self.forecast_all: # In case of recontruction
             self.df_data = df  # In case of recontruction
             self.targets = df  # In case of recontruction
+            #self.out_window = 1
         else: # In case of recontruction
             self.df_data = df  # In case of recontruction
             self.targets = df  # In case of recontruction
 
-        self.sequence_length = sequence_length
-        self.out_window = out_window
+
 
     def __len__(self):
         return len(self.df_data)

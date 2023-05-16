@@ -102,48 +102,79 @@ def read_dataset(dataset_name, scaled,columns_subset, dataset_subset, cols,
         return df_train_val, df_test, train_iter, test_iter, test_iter_loss
 
 
-def unrolling_batches(num_batch, test_iter, sequence_length, cols, shift=None):
+def unrolling_batches(num_batch, test_iter, sequence_length, cols, shift=None, out_window=None):
     if shift==None:
         shift = np.random.randint(len(test_iter.dataset.df_data)-100)
     x = np.zeros((num_batch, sequence_length, len(cols)))
-
-    for i in range(num_batch):
-        x[i,:,:] = test_iter.dataset.df_data.iloc[shift + i*sequence_length:shift + (i+1)*sequence_length,:]\
-        .values
+    
+    if out_window==None:
+        out_window=sequence_length
+        horizon = out_window*num_batch
+    else:
+        horizon = out_window*num_batch
+        
+    
+    if horizon <= num_batch*sequence_length:
+        for i in range(num_batch):
+            x[i,:,:] = test_iter.dataset.df_data.iloc[shift + i*out_window:shift + (i)*out_window + sequence_length,:]\
+            .values
+    else:
+        for i in range(num_batch):
+                x[i,:,:] = test_iter.dataset.df_data.iloc[shift + i*(out_window):shift \
+                           + (i)*(out_window) + sequence_length,:].values
 
     x = torch.from_numpy(x).float()
     print('random shift', shift)
     return x, shift
 
 
-def show_results(x, yo, cols, model_name, params_conf, par_nums, shift, 
-                 num_batch, architecture='lstm_ae', save=False):
+def show_results(x, yoo, cols, model_name, params_conf, par_nums, shift, 
+                 num_batch, architecture='lstm_ae', save=False, out_window=None, test_iter=None):
     
-    if architecture == 'lstm':
-        yo.flatten(0,1)[params_conf['sequence_length']:,:]=yo.flatten(0,1)[:-params_conf['sequence_length'],:].clone()
-        yo.flatten(0,1)[:params_conf['sequence_length'],:]=0
-    
+    if out_window!=None:
+        horizon = out_window*num_batch
+    else:
+        out_window = params_conf['out_window']
+        horizon = params_conf['out_window']*num_batch
+        
+    #if horizon > len(x.flatten(0,1)[:,0].to("cpu").detach().numpy()):
+    if test_iter!=None:
+        x_plot = test_iter.dataset.df_data.values[shift:shift+horizon+params_conf['sequence_length'],:]
+            
+    if architecture == 'lstm' or architecture == 'enc_dec_lstm':
+        #if horizon == len(x.flatten(0,1)[:,0].to("cpu").detach().numpy()):
+            #yo.flatten(0,1)[params_conf['sequence_length']:,:]=yo.flatten(0,1)[:-params_conf['sequence_length'],:].clone()
+        yo = torch.zeros((horizon + params_conf['sequence_length'], yoo.shape[2]))
+        yo[params_conf['sequence_length']:,:]=yoo.flatten(0,1)[:,:].clone()
+        yo[:params_conf['sequence_length'],:]=0
+
     path = './figure_results/evaluation/{}/{}/shift_{}/'.format(architecture, model_name, shift, num_batch)
     for i in range(x.shape[2]):
         fig, ax = plt.subplots(1,1, figsize=(8,4))
 
-        ax.plot(yo.flatten(0,1)[:,i].to("cpu").detach().numpy(), 
+        ax.plot(yo[:,i].to("cpu").detach().numpy(), 
                    linestyle='--', label='reconstr', color='black')
-        ax.plot(x.flatten(0,1)[:,i].to("cpu").detach().numpy(), label ='original')
+        if horizon > len(x.flatten(0,1)[:,0].to("cpu").detach().numpy()):
+            ax.plot(x_plot[:,i], label ='original')
+        else:
+            #ax.plot(x.flatten(0,1)[:horizon+params_conf['sequence_length'],i].to("cpu").detach().numpy(), label ='original')
+            ax.plot(x_plot[:,i], label ='original')
         
-        if architecture=='lstm':
-            ax.plot(x.flatten(0,1)[:params_conf['sequence_length'],i].to("cpu").detach().numpy()
+        if architecture=='lstm' or architecture=='enc_dec_lstm':
+            #ax.plot(x.flatten(0,1)[:params_conf['sequence_length'],i].to("cpu").detach().numpy()
+            #, color = 'orange')
+            ax.plot(x_plot[:params_conf['sequence_length'],i]
             , color = 'orange')
-            ax.plot(yo.flatten(0,1)[:params_conf['sequence_length'],i].to("cpu").detach().numpy()
+            ax.plot(yo[:params_conf['sequence_length'],i].to("cpu").detach().numpy()
             , label ='warm-up', color = 'orange')
         
         x_i = x.flatten(0,1)[:,i]
-        y_o = yo.flatten(0,1)[:,i]
+        y_o = yo[:,i]
 
-        loss_u = torch.nn.L1Loss(reduction='none')(y_o, x_i)
-        loss_u = moving_average(loss_u.to("cpu").detach().numpy(), params_conf['sequence_length'])
+        #loss_u = torch.nn.L1Loss(reduction='none')(y_o, x_i)
+        #loss_u = moving_average(loss_u.to("cpu").detach().numpy(), params_conf['sequence_length'])
 
-        ax.plot(loss_u, label ='mean abs err')
+        #ax.plot(loss_u, label ='mean abs err')
         ax.set_xlabel('time steps')
         ax.set_ylabel('{}'.format(cols[i]))
         if architecture=='lstm_ae':
